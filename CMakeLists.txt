@@ -63,9 +63,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 
 # Include convenience functions
-include(Open3DLink3rdpartyLibraries)
 include(Open3DSetGlobalProperties)
-include(Open3DShowAndAbortOnWarning)
 
 # Open3D library
 add_subdirectory(cpp)
