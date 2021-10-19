@@ -67,10 +67,5 @@ include(Open3DLink3rdpartyLibraries)
 include(Open3DSetGlobalProperties)
 include(Open3DShowAndAbortOnWarning)
 
-# Enumerate all third-party libraries which we need later
-# This creates the necessary targets and sets the
-# Open3D_3RDPARTY_*_TARGETS variables we use in open3d_link_3rdparty_libraries
-include(3rdparty/find_dependencies.cmake)
-
 # Open3D library
 add_subdirectory(cpp)
