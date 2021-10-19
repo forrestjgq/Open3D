@@ -10,8 +10,8 @@ function(open3d_set_global_properties target)
         $<INSTALL_INTERFACE:${Open3D_INSTALL_INCLUDE_DIR}>
     )
 
-    # target_compile_definitions(${target} PUBLIC _GLIBCXX_USE_CXX11_ABI=1)
-    target_compile_definitions(${target} PUBLIC _GLIBCXX_USE_CXX11_ABI=0)
+    target_compile_definitions(${target} PUBLIC _GLIBCXX_USE_CXX11_ABI=1)
+    # target_compile_definitions(${target} PUBLIC _GLIBCXX_USE_CXX11_ABI=0)
 
 
 endfunction()
