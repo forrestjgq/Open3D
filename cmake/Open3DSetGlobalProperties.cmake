@@ -37,7 +37,4 @@ function(open3d_set_global_properties target)
         target_compile_definitions(${target} PRIVATE UNIX)
     endif()
 
-    # Require 64-bit indexing in vectorized code
-    target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:ISPC>:--addressing=64>)
-
 endfunction()
