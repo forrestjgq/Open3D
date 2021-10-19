@@ -20,10 +20,6 @@ function(open3d_set_global_properties target)
     # Required for static linking zeromq
     target_compile_definitions(${target} PRIVATE ZMQ_STATIC)
 
-    # Propagate build configuration into source code
-    if (USE_BLAS)
-        target_compile_definitions(${target} PRIVATE USE_BLAS)
-    endif()
     if (GLIBCXX_USE_CXX11_ABI)
         target_compile_definitions(${target} PUBLIC _GLIBCXX_USE_CXX11_ABI=1)
     else()
