@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2021 www.open3d.org
+// Copyright (c) 2018-2021 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -159,19 +159,21 @@ struct FileDialog::Impl {
             auto d = utility::filesystem::GetFileNameWithoutDirectory(dir);
             entries_.emplace_back(d, DirEntry::Type::DIR);
         }
-        std::unordered_set<std::string> filter;
-        auto it = filter_idx_2_filter.find(filter_->GetSelectedIndex());
-        if (it != filter_idx_2_filter.end()) {
-            filter = it->second;
-        }
-        for (auto &file : raw_files) {
-            auto f = utility::filesystem::GetFileNameWithoutDirectory(file);
-            auto ext = utility::filesystem::GetFileExtensionInLowerCase(f);
-            if (!ext.empty()) {
-                ext = std::string(".") + ext;
+        if (mode_ != Mode::OPEN_DIR) {
+            std::unordered_set<std::string> filter;
+            auto it = filter_idx_2_filter.find(filter_->GetSelectedIndex());
+            if (it != filter_idx_2_filter.end()) {
+                filter = it->second;
             }
-            if (filter.empty() || filter.find(ext) != filter.end()) {
-                entries_.emplace_back(f, DirEntry::Type::FILE);
+            for (auto &file : raw_files) {
+                auto f = utility::filesystem::GetFileNameWithoutDirectory(file);
+                auto ext = utility::filesystem::GetFileExtensionInLowerCase(f);
+                if (!ext.empty()) {
+                    ext = std::string(".") + ext;
+                }
+                if (filter.empty() || filter.find(ext) != filter.end()) {
+                    entries_.emplace_back(f, DirEntry::Type::FILE);
+                }
             }
         }
         std::sort(entries_.begin(), entries_.end());
@@ -223,7 +225,7 @@ struct FileDialog::Impl {
     }
 
     void UpdateOk() {
-        ok_->SetEnabled(std::string(filename_->GetText()) != "");
+        ok_->SetEnabled(mode_ == Mode::OPEN_DIR || std::string(filename_->GetText()) != "");
     }
 };
 
@@ -253,7 +255,7 @@ FileDialog::FileDialog(Mode mode, const char *title, const Theme &theme)
     layout->AddChild(impl_->filelist_);
 
     impl_->cancel_ = std::make_shared<Button>("Cancel");
-    if (mode == Mode::OPEN) {
+    if (mode == Mode::OPEN || mode == Mode::OPEN_DIR) {
         impl_->ok_ = std::make_shared<Button>("Open");
     } else if (mode == Mode::SAVE) {
         impl_->ok_ = std::make_shared<Button>("Save");
@@ -405,8 +407,12 @@ void FileDialog::OnDone() {
                 }
             }
         }
-        std::cout << "[o3d] name: '" << name << "'" << std::endl;
-        this->impl_->on_done_((dir + "/" + name).c_str());
+        auto path = dir;
+        if (!name.empty()) {
+            std::cout << "[o3d] name: '" << name << "'" << std::endl;
+            path = dir + "/" + name;
+        }
+        this->impl_->on_done_(path.c_str());
     } else {
         utility::LogError("FileDialog: need to call SetOnDone()");
     }
