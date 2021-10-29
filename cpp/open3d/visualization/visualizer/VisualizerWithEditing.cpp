@@ -46,6 +46,9 @@
 namespace open3d {
 namespace visualization {
 
+std::shared_ptr<geometry::Geometry> VisualizerWithEditing::GetEditingGeometry() {
+    return editing_geometry_ptr_;
+}
 bool VisualizerWithEditing::AddGeometry(
         std::shared_ptr<const geometry::Geometry> geometry_ptr,
         bool reset_bounding_box) {

@@ -179,7 +179,9 @@ void pybind_visualizer(py::module &m) {
                             vis.GetWindowName();
                  })
             .def("get_picked_points", &VisualizerWithEditing::GetPickedPoints,
-                 "Function to get picked points");
+                 "Function to get picked points")
+            .def("get_editing_geometry", &VisualizerWithEditing::GetEditingGeometry,
+                 "Function to get editing geometry");
 
     py::class_<VisualizerWithVertexSelection,
                PyVisualizer<VisualizerWithVertexSelection>,

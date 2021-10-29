@@ -67,6 +67,8 @@ public:
     void BuildUtilities() override;
     int PickPoint(double x, double y);
     std::vector<size_t> &GetPickedPoints();
+    /// Function to retrieve current editing geometry
+    std::shared_ptr<geometry::Geometry> GetEditingGeometry();
 
 protected:
     bool InitViewControl() override;
