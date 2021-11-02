@@ -391,9 +391,13 @@ void VisualizerWithEditing::KeyPressCallback(
                     editing_geometry_renderer_ptr_->UpdateGeometry();
                     const char *filename;
                     const char *pattern[1] = {"*.ply"};
-                    std::string default_filename =
-                            default_directory_ + "cropped_" +
-                            std::to_string(crop_action_count_ + 1) + ".ply";
+
+                    auto default_filename = default_file_path_;
+                    if (default_filename.empty()) {
+                        default_filename =
+                                default_directory_ + "cropped_" +
+                                std::to_string(crop_action_count_ + 1) + ".ply";
+                    }
                     if (use_dialog_) {
                         filename = tinyfd_saveFileDialog(
                                 "geometry::PointCloud file",
@@ -424,9 +428,13 @@ void VisualizerWithEditing::KeyPressCallback(
                     editing_geometry_renderer_ptr_->UpdateGeometry();
                     const char *filename;
                     const char *pattern[1] = {"*.ply"};
-                    std::string default_filename =
-                            default_directory_ + "cropped_" +
-                            std::to_string(crop_action_count_ + 1) + ".ply";
+
+                    auto default_filename = default_file_path_;
+                    if (default_filename.empty()) {
+                        default_filename =
+                                default_directory_ + "cropped_" +
+                                std::to_string(crop_action_count_ + 1) + ".ply";
+                    }
                     if (use_dialog_) {
                         filename = tinyfd_saveFileDialog(
                                 "Mesh file", default_filename.c_str(), 1,

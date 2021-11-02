@@ -48,10 +48,12 @@ public:
 public:
     VisualizerWithEditing(double voxel_size = -1.0,
                           bool use_dialog = true,
-                          const std::string &directory = "")
+                          const std::string &directory = "",
+                          const std::string &file_path = "")
         : voxel_size_(voxel_size),
           use_dialog_(use_dialog),
-          default_directory_(directory) {}
+          default_directory_(directory),
+          default_file_path_(file_path) {}
     ~VisualizerWithEditing() override {}
     VisualizerWithEditing(const VisualizerWithEditing &) = delete;
     VisualizerWithEditing &operator=(const VisualizerWithEditing &) = delete;
@@ -106,6 +108,7 @@ protected:
     double voxel_size_ = -1.0;
     bool use_dialog_ = true;
     std::string default_directory_;
+    std::string default_file_path_;
     unsigned int crop_action_count_ = 0;
 };
 
