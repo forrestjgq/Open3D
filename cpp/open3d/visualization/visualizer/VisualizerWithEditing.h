@@ -90,6 +90,7 @@ protected:
     void InvalidateSelectionPolygon();
     void InvalidatePicking();
     void SaveCroppingResult(const std::string &filename = "");
+    void Crop(bool strip);
 
 protected:
     std::shared_ptr<SelectionPolygon> selection_polygon_ptr_;
