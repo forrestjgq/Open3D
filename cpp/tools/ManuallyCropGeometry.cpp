@@ -40,7 +40,7 @@ void PrintHelp() {
     utility::LogInfo("    --help, -h                : Print help information.");
     utility::LogInfo("    --verbose n               : Set verbose level (0-4).");
     utility::LogInfo("    --voxel_size d            : Set downsample voxel size.");
-    utility::LogInfo("    --without_dialog          : Disable dialogs. Default files will be used.");
+//    utility::LogInfo("    --without_dialog          : Disable dialogs. Default files will be used.");
     // clang-format on
 }
 
@@ -57,11 +57,11 @@ int main(int argc, char **argv) {
     utility::SetVerbosityLevel((utility::VerbosityLevel)verbose);
     double voxel_size =
             utility::GetProgramOptionAsDouble(argc, argv, "--voxel_size", -1.0);
-    bool with_dialog =
-            !utility::ProgramOptionExists(argc, argv, "--without_dialog");
+//    bool with_dialog =
+//            !utility::ProgramOptionExists(argc, argv, "--without_dialog");
 
     visualization::VisualizerWithEditing vis(
-            voxel_size, with_dialog,
+            voxel_size,
             utility::filesystem::GetFileParentDirectory(argv[1]));
     vis.CreateVisualizerWindow("Crop Point Cloud", 1920, 1080, 100, 100);
     if (utility::ProgramOptionExists(argc, argv, "--pointcloud")) {

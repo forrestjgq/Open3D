@@ -128,7 +128,7 @@ void VisualizerWithEditing::PrintVisualizerHelp() {
     utility::LogInfo("    X            : Enter orthogonal view along X axis, press again to flip.");
     utility::LogInfo("    Y            : Enter orthogonal view along Y axis, press again to flip.");
     utility::LogInfo("    Z            : Enter orthogonal view along Z axis, press again to flip.");
-    utility::LogInfo("    K            : Lock / unlock camera.");
+    utility::LogInfo("    K/E          : Lock / unlock camera.");
     utility::LogInfo("    Ctrl + D     : Downsample point cloud with a voxel grid.");
     utility::LogInfo("    Ctrl + R     : Reset geometry to its initial state.");
     utility::LogInfo("    Shift + +/-  : Increase/decrease picked point size..");
@@ -143,6 +143,7 @@ void VisualizerWithEditing::PrintVisualizerHelp() {
     utility::LogInfo("                                  close the polygon.");
     utility::LogInfo("    C                           : Crop the geometry with selection region.");
     utility::LogInfo("    X                           : Remove points within selection region.");
+    utility::LogInfo("    Ctrl + S                    : Save editing geometry to file");
     utility::LogInfo("");
     // clang-format on
 }
@@ -273,44 +274,54 @@ bool VisualizerWithEditing::InitRenderOption() {
             new RenderOptionWithEditing);
     return true;
 }
+void VisualizerWithEditing::Save() {
+    if (!editing_geometry_ptr_) {
+        return;
+    }
+
+    auto default_filename = save_file_path_;
+    const char *filename = default_filename.c_str();
+    if (default_filename.length() < 5 ||
+        default_filename.substr(default_filename.length()-4) !=".ply") {
+        if (default_filename.empty()) {
+            default_filename = utility::filesystem::GetWorkingDirectory();
+        }
+        default_filename += "/cropped.ply";
+        const char *pattern[1] = {"*.ply"};
+        switch (editing_geometry_ptr_->GetGeometryType()) {
+            case geometry::Geometry::GeometryType::PointCloud:
+                filename = tinyfd_saveFileDialog(
+                        "geometry::PointCloud file",
+                        default_filename.c_str(), 1, pattern,
+                        "Polygon File Format (*.ply)");
+                break;
+            case geometry::Geometry::GeometryType::TriangleMesh:
+                filename = tinyfd_saveFileDialog(
+                        "Mesh file", default_filename.c_str(), 1,
+                        pattern, "Polygon File Format (*.ply)");
+                break;
+            default:
+                return;
+        }
+    }
+
+    if (filename == nullptr) {
+        utility::LogWarning( "No filename is given. Abort saving.");
+    } else {
+        SaveCroppingResult(filename);
+    }
+}
 
 void VisualizerWithEditing::Crop(bool strip) {
-    utility::LogWarning( "Cropping {}", strip);
     auto &view_control = (ViewControlWithEditing &)(*view_control_ptr_);
     if (editing_geometry_ptr_ &&
         editing_geometry_ptr_->GetGeometryType() ==
         geometry::Geometry::GeometryType::PointCloud) {
         glfwMakeContextCurrent(window_);
-        geometry::PointCloud &pcd =
-                (geometry::PointCloud &)*editing_geometry_ptr_;
+        auto &pcd = (geometry::PointCloud &)*editing_geometry_ptr_;
         auto index = selection_polygon_ptr_->CropPointCloudIndex(pcd, view_control);
         pcd = *pcd.SelectByIndex(index, strip);
         editing_geometry_renderer_ptr_->UpdateGeometry();
-        const char *filename;
-        const char *pattern[1] = {"*.ply"};
-
-        auto default_filename = default_file_path_;
-        if (default_filename.empty()) {
-            default_filename =
-                    default_directory_ + "cropped_" +
-                    std::to_string(crop_action_count_ + 1) + ".ply";
-        }
-        if (use_dialog_) {
-            filename = tinyfd_saveFileDialog(
-                    "geometry::PointCloud file",
-                    default_filename.c_str(), 1, pattern,
-                    "Polygon File Format (*.ply)");
-        } else {
-            filename = default_filename.c_str();
-        }
-        if (filename == NULL) {
-            utility::LogWarning(
-                    "No filename is given. Abort saving.");
-        } else {
-            SaveCroppingResult(filename);
-            crop_action_count_++;
-        }
-        view_control.ToggleLocking();
         InvalidateSelectionPolygon();
         InvalidatePicking();
     } else if (editing_geometry_ptr_ &&
@@ -318,36 +329,11 @@ void VisualizerWithEditing::Crop(bool strip) {
                geometry::Geometry::GeometryType::
                TriangleMesh) {
         glfwMakeContextCurrent(window_);
-        geometry::TriangleMesh &mesh =
-                (geometry::TriangleMesh &)*editing_geometry_ptr_;
+        auto &mesh = (geometry::TriangleMesh &)*editing_geometry_ptr_;
         auto index = selection_polygon_ptr_->CropTriangleMeshIndex(
                 mesh, view_control);
         mesh = *mesh.SelectByIndex(index, !strip);
         editing_geometry_renderer_ptr_->UpdateGeometry();
-        const char *filename;
-        const char *pattern[1] = {"*.ply"};
-
-        auto default_filename = default_file_path_;
-        if (default_filename.empty()) {
-            default_filename =
-                    default_directory_ + "cropped_" +
-                    std::to_string(crop_action_count_ + 1) + ".ply";
-        }
-        if (use_dialog_) {
-            filename = tinyfd_saveFileDialog(
-                    "Mesh file", default_filename.c_str(), 1,
-                    pattern, "Polygon File Format (*.ply)");
-        } else {
-            filename = default_filename.c_str();
-        }
-        if (filename == NULL) {
-            utility::LogWarning(
-                    "No filename is given. Abort saving.");
-        } else {
-            SaveCroppingResult(filename);
-            crop_action_count_++;
-        }
-        view_control.ToggleLocking();
         InvalidateSelectionPolygon();
         InvalidatePicking();
     }
@@ -384,6 +370,14 @@ void VisualizerWithEditing::KeyPressCallback(
                     ViewControlWithEditing::EditingMode::FreeMode);
             utility::LogDebug("[Visualizer] Enter freeview mode.");
             break;
+        case GLFW_KEY_S:
+            if (mods & GLFW_MOD_CONTROL) {
+                Save();
+            } else {
+                Visualizer::KeyPressCallback(window, key, scancode, action,
+                                             mods);
+            }
+            break;
         case GLFW_KEY_X:
             if (view_control.IsLocked()) {
                 if (selection_polygon_ptr_) {
@@ -405,6 +399,12 @@ void VisualizerWithEditing::KeyPressCallback(
             view_control.ToggleEditingZ();
             utility::LogDebug("[Visualizer] Enter orthogonal Z editing mode.");
             break;
+        case GLFW_KEY_ESCAPE:
+            if (view_control.IsLocked()) {
+                view_control.ToggleLocking();
+            }
+            break;
+        case GLFW_KEY_E:
         case GLFW_KEY_K:
             view_control.ToggleLocking();
             InvalidateSelectionPolygon();
@@ -423,37 +423,12 @@ void VisualizerWithEditing::KeyPressCallback(
             break;
         case GLFW_KEY_D:
             if (mods & GLFW_MOD_CONTROL) {
-                if (use_dialog_) {
-                    std::string buff;
-                    buff = fmt::format("{:.4f}", voxel_size_);
-                    const char *str = tinyfd_inputBox(
-                            "Set voxel size",
-                            "Set voxel size (ignored if it is non-positive)",
-                            buff.c_str());
-                    if (str == NULL) {
-                        utility::LogWarning(
-                                "Illegal input, using default voxel size.");
-                    } else {
-                        char *end;
-                        errno = 0;
-                        double l = std::strtod(str, &end);
-                        if (errno == ERANGE &&
-                            (l == HUGE_VAL || l == -HUGE_VAL)) {
-                            utility::LogWarning(
-                                    "Illegal input, using default voxel "
-                                    "size.");
-                        } else {
-                            voxel_size_ = l;
-                        }
-                    }
-                }
                 if (voxel_size_ > 0.0 && editing_geometry_ptr_ &&
                     editing_geometry_ptr_->GetGeometryType() ==
                             geometry::Geometry::GeometryType::PointCloud) {
                     utility::LogInfo("Voxel downsample with voxel size {:.4f}.",
                                      voxel_size_);
-                    geometry::PointCloud &pcd =
-                            (geometry::PointCloud &)*editing_geometry_ptr_;
+                    auto &pcd = (geometry::PointCloud &)*editing_geometry_ptr_;
                     pcd = *pcd.VoxelDownSample(voxel_size_);
                     UpdateGeometry();
                 } else {
@@ -467,7 +442,8 @@ void VisualizerWithEditing::KeyPressCallback(
             }
             break;
         case GLFW_KEY_C:
-            if (view_control.IsLocked() && selection_polygon_ptr_) {
+            if (view_control.IsLocked() &&
+                selection_polygon_ptr_ && !selection_polygon_ptr_->IsEmpty()) {
                 Crop(false);
             } else {
                 Visualizer::KeyPressCallback(window, key, scancode, action,
