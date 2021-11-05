@@ -181,7 +181,9 @@ void pybind_visualizer(py::module &m) {
             .def("get_picked_points", &VisualizerWithEditing::GetPickedPoints,
                  "Function to get picked points")
             .def("get_editing_geometry", &VisualizerWithEditing::GetEditingGeometry,
-                 "Function to get editing geometry");
+                 "Function to get editing geometry")
+            .def("get_discarded_geometry", &VisualizerWithEditing::GetDiscardedGeometry,
+                 "Function to get the other part of original geometry");
 
     py::class_<VisualizerWithVertexSelection,
                PyVisualizer<VisualizerWithVertexSelection>,
