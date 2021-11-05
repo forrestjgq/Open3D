@@ -67,6 +67,8 @@ public:
     std::vector<size_t> &GetPickedPoints();
     /// Function to retrieve current editing geometry
     std::shared_ptr<geometry::Geometry> GetEditingGeometry();
+    /// Function to retrieve discarded geometry
+    std::shared_ptr<geometry::Geometry> GetDiscardedGeometry();
 
 protected:
     bool InitViewControl() override;
@@ -88,6 +90,8 @@ protected:
     void SaveCroppingResult(const std::string &filename = "");
     void Crop(bool strip);
     void Save();
+    void Undo();
+    void UpdateBackground();
 
 protected:
     std::shared_ptr<SelectionPolygon> selection_polygon_ptr_;
@@ -101,6 +105,7 @@ protected:
 
     std::shared_ptr<const geometry::Geometry> original_geometry_ptr_;
     std::shared_ptr<geometry::Geometry> editing_geometry_ptr_;
+    std::vector<std::shared_ptr<geometry::Geometry>> discarded_geometries_;
     std::shared_ptr<glsl::GeometryRenderer> editing_geometry_renderer_ptr_;
 
     double voxel_size_ = -1.0;

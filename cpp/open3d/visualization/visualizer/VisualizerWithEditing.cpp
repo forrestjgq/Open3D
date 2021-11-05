@@ -49,6 +49,45 @@ namespace visualization {
 std::shared_ptr<geometry::Geometry> VisualizerWithEditing::GetEditingGeometry() {
     return editing_geometry_ptr_;
 }
+std::shared_ptr<geometry::Geometry> VisualizerWithEditing::GetDiscardedGeometry() {
+    if (discarded_geometries_.empty()) {
+        return nullptr;
+    }
+
+    auto geo = discarded_geometries_[0];
+    if (geo->GetGeometryType() == geometry::Geometry::GeometryType::PointCloud) {
+        auto pcd = std::make_shared<geometry::PointCloud>();
+        for (auto &other : discarded_geometries_) {
+            *pcd += (geometry::PointCloud &)*other;
+        }
+        return pcd;
+    } else if (geo->GetGeometryType() == geometry::Geometry::GeometryType::TriangleMesh) {
+        auto mesh = std::make_shared<geometry::TriangleMesh>();
+        for (auto &other : discarded_geometries_) {
+            *mesh += (geometry::TriangleMesh &)*other;
+        }
+        return mesh;
+    }
+    return nullptr;
+}
+void VisualizerWithEditing::Undo() {
+    if (!editing_geometry_ptr_ || discarded_geometries_.empty()) {
+        return;
+    }
+    auto last = discarded_geometries_.back();
+    discarded_geometries_.pop_back();
+
+    if (last->GetGeometryType() == geometry::Geometry::GeometryType::PointCloud) {
+        auto &pcd = (geometry::PointCloud &)*editing_geometry_ptr_;
+        pcd += (geometry::PointCloud &)*last;
+        editing_geometry_renderer_ptr_->UpdateGeometry();
+    } else if (last->GetGeometryType() == geometry::Geometry::GeometryType::TriangleMesh) {
+        auto &mesh = (geometry::TriangleMesh &)*editing_geometry_ptr_;
+        mesh += (geometry::TriangleMesh &)*last;
+        editing_geometry_renderer_ptr_->UpdateGeometry();
+    }
+}
+
 bool VisualizerWithEditing::AddGeometry(
         std::shared_ptr<const geometry::Geometry> geometry_ptr,
         bool reset_bounding_box) {
@@ -141,9 +180,11 @@ void VisualizerWithEditing::PrintVisualizerHelp() {
     utility::LogInfo("                                  Left mouse button to add point. Right mouse");
     utility::LogInfo("                                  button to remove point. Release Ctrl key to");
     utility::LogInfo("                                  close the polygon.");
+    utility::LogInfo("    ESC                         : Unlock camera.");
     utility::LogInfo("    C                           : Crop the geometry with selection region.");
     utility::LogInfo("    X                           : Remove points within selection region.");
-    utility::LogInfo("    Ctrl + S                    : Save editing geometry to file");
+    utility::LogInfo("    Ctrl + S                    : Save editing geometry to file.");
+    utility::LogInfo("    Ctrl + Z                    : Undo latest cropping.");
     utility::LogInfo("");
     // clang-format on
 }
@@ -269,6 +310,20 @@ bool VisualizerWithEditing::InitViewControl() {
     return true;
 }
 
+void VisualizerWithEditing::UpdateBackground() {
+    auto &bg = GetRenderOption().background_color_;
+    auto &view_control = (ViewControlWithEditing &)(*view_control_ptr_);
+    if (view_control.IsLocked()) {
+        bg[0] = 0;
+        bg[1] = 0.5;
+        bg[2] = 0.5;
+    } else {
+        bg[0] = 1;
+        bg[1] = 1;
+        bg[2] = 1;
+    }
+    UpdateRender();
+}
 bool VisualizerWithEditing::InitRenderOption() {
     render_option_ptr_ = std::unique_ptr<RenderOptionWithEditing>(
             new RenderOptionWithEditing);
@@ -320,6 +375,8 @@ void VisualizerWithEditing::Crop(bool strip) {
         glfwMakeContextCurrent(window_);
         auto &pcd = (geometry::PointCloud &)*editing_geometry_ptr_;
         auto index = selection_polygon_ptr_->CropPointCloudIndex(pcd, view_control);
+        auto discard = pcd.SelectByIndex(index, !strip);
+        discarded_geometries_.push_back(discard);
         pcd = *pcd.SelectByIndex(index, strip);
         editing_geometry_renderer_ptr_->UpdateGeometry();
         InvalidateSelectionPolygon();
@@ -332,6 +389,8 @@ void VisualizerWithEditing::Crop(bool strip) {
         auto &mesh = (geometry::TriangleMesh &)*editing_geometry_ptr_;
         auto index = selection_polygon_ptr_->CropTriangleMeshIndex(
                 mesh, view_control);
+        auto discard = mesh.SelectByIndex(index, strip);
+        discarded_geometries_.push_back(discard);
         mesh = *mesh.SelectByIndex(index, !strip);
         editing_geometry_renderer_ptr_->UpdateGeometry();
         InvalidateSelectionPolygon();
@@ -396,21 +455,31 @@ void VisualizerWithEditing::KeyPressCallback(
             utility::LogDebug("[Visualizer] Enter orthogonal Y editing mode.");
             break;
         case GLFW_KEY_Z:
-            view_control.ToggleEditingZ();
-            utility::LogDebug("[Visualizer] Enter orthogonal Z editing mode.");
+            if (mods & GLFW_MOD_CONTROL) {
+                if (view_control.IsLocked()) {
+                    Undo();
+                }
+            } else {
+                view_control.ToggleEditingZ();
+                utility::LogDebug("[Visualizer] Enter orthogonal Z editing mode.");
+            }
             break;
         case GLFW_KEY_ESCAPE:
             if (view_control.IsLocked()) {
                 view_control.ToggleLocking();
+                InvalidateSelectionPolygon();
+                UpdateBackground();
             }
             break;
         case GLFW_KEY_E:
-        case GLFW_KEY_K:
+        case GLFW_KEY_K: {
             view_control.ToggleLocking();
             InvalidateSelectionPolygon();
             utility::LogDebug("[Visualizer] Camera %s.",
                               view_control.IsLocked() ? "Lock" : "Unlock");
+            UpdateBackground();
             break;
+        }
         case GLFW_KEY_R:
             if (mods & GLFW_MOD_CONTROL) {
                 (geometry::PointCloud &)*editing_geometry_ptr_ =
