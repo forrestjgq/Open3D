@@ -245,8 +245,8 @@ void Layout1D::AddStretch() { AddChild(std::make_shared<Stretch>()); }
 Size Layout1D::CalcPreferredSize(const LayoutContext& context,
                                  const Constraints& constraints) const {
     int minor;
-    std::vector<int> major =
-            CalcMajor(context, constraints, impl_->dir_, GetVisibleChildren(), &minor);
+    std::vector<int> major = CalcMajor(context, constraints, impl_->dir_,
+                                       GetVisibleChildren(), &minor);
     if (impl_->minor_axis_size_ < Widget::DIM_GROW) {
         minor = impl_->minor_axis_size_;
     }
@@ -312,7 +312,7 @@ void Layout1D::Layout(const LayoutContext& context) {
     } else if (frame_size < total) {
         int n_shrinkable = num_grow;
         if (impl_->dir_ == VERT) {
-            for (auto &child : children) {
+            for (auto& child : children) {
                 if (std::dynamic_pointer_cast<ScrollableVert>(child)) {
                     n_shrinkable++;
                 }
@@ -325,8 +325,8 @@ void Layout1D::Layout(const LayoutContext& context) {
             for (size_t i = 0; i < major.size(); ++i) {
                 if (major[i] >= Widget::DIM_GROW ||
                     (impl_->dir_ == VERT &&
-                     std::dynamic_pointer_cast<ScrollableVert>(
-                             children[i]) != nullptr)) {
+                     std::dynamic_pointer_cast<ScrollableVert>(children[i]) !=
+                             nullptr)) {
                     major[i] -= excess;
                     if (leftover > 0) {
                         major[i] -= 1;
