@@ -57,12 +57,11 @@ int main(int argc, char **argv) {
     utility::SetVerbosityLevel((utility::VerbosityLevel)verbose);
     double voxel_size =
             utility::GetProgramOptionAsDouble(argc, argv, "--voxel_size", -1.0);
-//    bool with_dialog =
-//            !utility::ProgramOptionExists(argc, argv, "--without_dialog");
+    //    bool with_dialog =
+    //            !utility::ProgramOptionExists(argc, argv, "--without_dialog");
 
     visualization::VisualizerWithEditing vis(
-            voxel_size,
-            utility::filesystem::GetFileParentDirectory(argv[1]));
+            voxel_size, utility::filesystem::GetFileParentDirectory(argv[1]));
     vis.CreateVisualizerWindow("Crop Point Cloud", 1920, 1080, 100, 100);
     if (utility::ProgramOptionExists(argc, argv, "--pointcloud")) {
         auto pcd_ptr = io::CreatePointCloudFromFile(argv[2]);

@@ -48,8 +48,7 @@ public:
 public:
     VisualizerWithEditing(double voxel_size = -1.0,
                           const std::string &file_path = "")
-        : voxel_size_(voxel_size),
-          save_file_path_(file_path) {}
+        : voxel_size_(voxel_size), save_file_path_(file_path) {}
     ~VisualizerWithEditing() override {}
     VisualizerWithEditing(const VisualizerWithEditing &) = delete;
     VisualizerWithEditing &operator=(const VisualizerWithEditing &) = delete;

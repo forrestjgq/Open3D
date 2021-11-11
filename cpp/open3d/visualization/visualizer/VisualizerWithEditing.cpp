@@ -46,22 +46,26 @@
 namespace open3d {
 namespace visualization {
 
-std::shared_ptr<geometry::Geometry> VisualizerWithEditing::GetEditingGeometry() {
+std::shared_ptr<geometry::Geometry>
+VisualizerWithEditing::GetEditingGeometry() {
     return editing_geometry_ptr_;
 }
-std::shared_ptr<geometry::Geometry> VisualizerWithEditing::GetDiscardedGeometry() {
+std::shared_ptr<geometry::Geometry>
+VisualizerWithEditing::GetDiscardedGeometry() {
     if (discarded_geometries_.empty()) {
         return nullptr;
     }
 
     auto geo = discarded_geometries_[0];
-    if (geo->GetGeometryType() == geometry::Geometry::GeometryType::PointCloud) {
+    if (geo->GetGeometryType() ==
+        geometry::Geometry::GeometryType::PointCloud) {
         auto pcd = std::make_shared<geometry::PointCloud>();
         for (auto &other : discarded_geometries_) {
             *pcd += (geometry::PointCloud &)*other;
         }
         return pcd;
-    } else if (geo->GetGeometryType() == geometry::Geometry::GeometryType::TriangleMesh) {
+    } else if (geo->GetGeometryType() ==
+               geometry::Geometry::GeometryType::TriangleMesh) {
         auto mesh = std::make_shared<geometry::TriangleMesh>();
         for (auto &other : discarded_geometries_) {
             *mesh += (geometry::TriangleMesh &)*other;
@@ -77,11 +81,13 @@ void VisualizerWithEditing::Undo() {
     auto last = discarded_geometries_.back();
     discarded_geometries_.pop_back();
 
-    if (last->GetGeometryType() == geometry::Geometry::GeometryType::PointCloud) {
+    if (last->GetGeometryType() ==
+        geometry::Geometry::GeometryType::PointCloud) {
         auto &pcd = (geometry::PointCloud &)*editing_geometry_ptr_;
         pcd += (geometry::PointCloud &)*last;
         editing_geometry_renderer_ptr_->UpdateGeometry();
-    } else if (last->GetGeometryType() == geometry::Geometry::GeometryType::TriangleMesh) {
+    } else if (last->GetGeometryType() ==
+               geometry::Geometry::GeometryType::TriangleMesh) {
         auto &mesh = (geometry::TriangleMesh &)*editing_geometry_ptr_;
         mesh += (geometry::TriangleMesh &)*last;
         editing_geometry_renderer_ptr_->UpdateGeometry();
@@ -337,7 +343,7 @@ void VisualizerWithEditing::Save() {
     auto default_filename = save_file_path_;
     const char *filename = default_filename.c_str();
     if (default_filename.length() < 5 ||
-        default_filename.substr(default_filename.length()-4) !=".ply") {
+        default_filename.substr(default_filename.length() - 4) != ".ply") {
         if (default_filename.empty()) {
             default_filename = utility::filesystem::GetWorkingDirectory();
         }
@@ -346,14 +352,13 @@ void VisualizerWithEditing::Save() {
         switch (editing_geometry_ptr_->GetGeometryType()) {
             case geometry::Geometry::GeometryType::PointCloud:
                 filename = tinyfd_saveFileDialog(
-                        "geometry::PointCloud file",
-                        default_filename.c_str(), 1, pattern,
-                        "Polygon File Format (*.ply)");
+                        "geometry::PointCloud file", default_filename.c_str(),
+                        1, pattern, "Polygon File Format (*.ply)");
                 break;
             case geometry::Geometry::GeometryType::TriangleMesh:
                 filename = tinyfd_saveFileDialog(
-                        "Mesh file", default_filename.c_str(), 1,
-                        pattern, "Polygon File Format (*.ply)");
+                        "Mesh file", default_filename.c_str(), 1, pattern,
+                        "Polygon File Format (*.ply)");
                 break;
             default:
                 return;
@@ -361,7 +366,7 @@ void VisualizerWithEditing::Save() {
     }
 
     if (filename == nullptr) {
-        utility::LogWarning( "No filename is given. Abort saving.");
+        utility::LogWarning("No filename is given. Abort saving.");
     } else {
         SaveCroppingResult(filename);
     }
@@ -371,10 +376,11 @@ void VisualizerWithEditing::Crop(bool strip) {
     auto &view_control = (ViewControlWithEditing &)(*view_control_ptr_);
     if (editing_geometry_ptr_ &&
         editing_geometry_ptr_->GetGeometryType() ==
-        geometry::Geometry::GeometryType::PointCloud) {
+                geometry::Geometry::GeometryType::PointCloud) {
         glfwMakeContextCurrent(window_);
         auto &pcd = (geometry::PointCloud &)*editing_geometry_ptr_;
-        auto index = selection_polygon_ptr_->CropPointCloudIndex(pcd, view_control);
+        auto index =
+                selection_polygon_ptr_->CropPointCloudIndex(pcd, view_control);
         auto discard = pcd.SelectByIndex(index, !strip);
         discarded_geometries_.push_back(discard);
         pcd = *pcd.SelectByIndex(index, strip);
@@ -383,8 +389,7 @@ void VisualizerWithEditing::Crop(bool strip) {
         InvalidatePicking();
     } else if (editing_geometry_ptr_ &&
                editing_geometry_ptr_->GetGeometryType() ==
-               geometry::Geometry::GeometryType::
-               TriangleMesh) {
+                       geometry::Geometry::GeometryType::TriangleMesh) {
         glfwMakeContextCurrent(window_);
         auto &mesh = (geometry::TriangleMesh &)*editing_geometry_ptr_;
         auto index = selection_polygon_ptr_->CropTriangleMeshIndex(
@@ -442,7 +447,7 @@ void VisualizerWithEditing::KeyPressCallback(
                 if (selection_polygon_ptr_) {
                     Crop(true);
                 } else {
-                    utility::LogDebug( "No polygon");
+                    utility::LogDebug("No polygon");
                 }
             } else {
                 view_control.ToggleEditingX();
@@ -461,7 +466,8 @@ void VisualizerWithEditing::KeyPressCallback(
                 }
             } else {
                 view_control.ToggleEditingZ();
-                utility::LogDebug("[Visualizer] Enter orthogonal Z editing mode.");
+                utility::LogDebug(
+                        "[Visualizer] Enter orthogonal Z editing mode.");
             }
             break;
         case GLFW_KEY_ESCAPE:
@@ -511,8 +517,8 @@ void VisualizerWithEditing::KeyPressCallback(
             }
             break;
         case GLFW_KEY_C:
-            if (view_control.IsLocked() &&
-                selection_polygon_ptr_ && !selection_polygon_ptr_->IsEmpty()) {
+            if (view_control.IsLocked() && selection_polygon_ptr_ &&
+                !selection_polygon_ptr_->IsEmpty()) {
                 Crop(false);
             } else {
                 Visualizer::KeyPressCallback(window, key, scancode, action,

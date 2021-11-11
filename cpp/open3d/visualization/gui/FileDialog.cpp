@@ -225,7 +225,8 @@ struct FileDialog::Impl {
     }
 
     void UpdateOk() {
-        ok_->SetEnabled(mode_ == Mode::OPEN_DIR || std::string(filename_->GetText()) != "");
+        ok_->SetEnabled(mode_ == Mode::OPEN_DIR ||
+                        std::string(filename_->GetText()) != "");
     }
 };
 
