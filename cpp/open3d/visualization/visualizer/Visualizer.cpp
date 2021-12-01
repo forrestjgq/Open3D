@@ -496,7 +496,7 @@ void Visualizer::PrintVisualizerHelp() {
     utility::LogInfo("    Ctrl/Cmd + V : Paste view status from clipboard.");
     utility::LogInfo("");
     utility::LogInfo("  -- General control --");
-    utility::LogInfo("    Q, Esc       : Exit window.");
+    utility::LogInfo("    Q            : Exit window.");
     utility::LogInfo("    H            : Print help message.");
     utility::LogInfo("    P, PrtScn    : Take a screen capture.");
     utility::LogInfo("    D            : Take a depth capture.");

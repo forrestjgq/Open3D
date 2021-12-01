@@ -87,7 +87,14 @@ protected:
     void InvalidateSelectionPolygon();
     void InvalidatePicking();
     void SaveCroppingResult(const std::string &filename = "");
-    void Crop(bool strip);
+    void Crop(bool del);
+    std::shared_ptr<geometry::Geometry> Crop(std::vector<size_t> &indexes,
+              bool del /* del = true indicates indexes should be deleted */
+    );
+    void Backup();
+    void FitPlane();
+    void ExitSelectEdit();
+    void CropSelected(bool del);
     void Save();
     void Undo();
     void UpdateBackground();
@@ -104,6 +111,13 @@ protected:
 
     std::shared_ptr<const geometry::Geometry> original_geometry_ptr_;
     std::shared_ptr<geometry::Geometry> editing_geometry_ptr_;
+
+    // in selection editing,
+    bool select_editing_ = false;
+    std::vector<std::shared_ptr<geometry::Geometry>> selected_original_geometries_; // with original color
+    std::vector<std::shared_ptr<geometry::Geometry>> selected_geometries_; // painted, used for rendering
+
+    // history of editing, for undo
     std::vector<std::shared_ptr<geometry::Geometry>> discarded_geometries_;
     std::shared_ptr<glsl::GeometryRenderer> editing_geometry_renderer_ptr_;
 

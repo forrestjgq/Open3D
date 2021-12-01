@@ -42,6 +42,7 @@
 #include "open3d/visualization/utility/SelectionPolygonVolume.h"
 #include "open3d/visualization/visualizer/RenderOptionWithEditing.h"
 #include "open3d/visualization/visualizer/ViewControlWithEditing.h"
+#include <map>
 
 namespace open3d {
 namespace visualization {
@@ -102,53 +103,39 @@ bool VisualizerWithEditing::AddGeometry(
     }
     glfwMakeContextCurrent(window_);
     original_geometry_ptr_ = geometry_ptr;
-    if (geometry_ptr->GetGeometryType() ==
-        geometry::Geometry::GeometryType::Unspecified) {
+    if (geometry_ptr->GetGeometryType() == geometry::Geometry::GeometryType::Unspecified) {
         return false;
-    } else if (geometry_ptr->GetGeometryType() ==
-               geometry::Geometry::GeometryType::PointCloud) {
+    } else if (geometry_ptr->GetGeometryType() == geometry::Geometry::GeometryType::PointCloud) {
         auto ptr = std::make_shared<geometry::PointCloud>();
         *ptr = (const geometry::PointCloud &)*original_geometry_ptr_;
         editing_geometry_ptr_ = ptr;
-        editing_geometry_renderer_ptr_ =
-                std::make_shared<glsl::PointCloudRenderer>();
-        if (!editing_geometry_renderer_ptr_->AddGeometry(
-                    editing_geometry_ptr_)) {
+        editing_geometry_renderer_ptr_ = std::make_shared<glsl::PointCloudRenderer>();
+        if (!editing_geometry_renderer_ptr_->AddGeometry(editing_geometry_ptr_)) {
             return false;
         }
-    } else if (geometry_ptr->GetGeometryType() ==
-               geometry::Geometry::GeometryType::LineSet) {
+    } else if (geometry_ptr->GetGeometryType() == geometry::Geometry::GeometryType::LineSet) {
         auto ptr = std::make_shared<geometry::LineSet>();
         *ptr = (const geometry::LineSet &)*original_geometry_ptr_;
         editing_geometry_ptr_ = ptr;
-        editing_geometry_renderer_ptr_ =
-                std::make_shared<glsl::LineSetRenderer>();
-        if (!editing_geometry_renderer_ptr_->AddGeometry(
-                    editing_geometry_ptr_)) {
+        editing_geometry_renderer_ptr_ = std::make_shared<glsl::LineSetRenderer>();
+        if (!editing_geometry_renderer_ptr_->AddGeometry(editing_geometry_ptr_)) {
             return false;
         }
-    } else if (geometry_ptr->GetGeometryType() ==
-                       geometry::Geometry::GeometryType::TriangleMesh ||
-               geometry_ptr->GetGeometryType() ==
-                       geometry::Geometry::GeometryType::HalfEdgeTriangleMesh) {
+    } else if (geometry_ptr->GetGeometryType() == geometry::Geometry::GeometryType::TriangleMesh ||
+               geometry_ptr->GetGeometryType() == geometry::Geometry::GeometryType::HalfEdgeTriangleMesh) {
         auto ptr = std::make_shared<geometry::TriangleMesh>();
         *ptr = (const geometry::TriangleMesh &)*original_geometry_ptr_;
         editing_geometry_ptr_ = ptr;
-        editing_geometry_renderer_ptr_ =
-                std::make_shared<glsl::TriangleMeshRenderer>();
-        if (!editing_geometry_renderer_ptr_->AddGeometry(
-                    editing_geometry_ptr_)) {
+        editing_geometry_renderer_ptr_ = std::make_shared<glsl::TriangleMeshRenderer>();
+        if (!editing_geometry_renderer_ptr_->AddGeometry(editing_geometry_ptr_)) {
             return false;
         }
-    } else if (geometry_ptr->GetGeometryType() ==
-               geometry::Geometry::GeometryType::Image) {
+    } else if (geometry_ptr->GetGeometryType() == geometry::Geometry::GeometryType::Image) {
         auto ptr = std::make_shared<geometry::Image>();
         *ptr = (const geometry::Image &)*original_geometry_ptr_;
         editing_geometry_ptr_ = ptr;
-        editing_geometry_renderer_ptr_ =
-                std::make_shared<glsl::ImageRenderer>();
-        if (!editing_geometry_renderer_ptr_->AddGeometry(
-                    editing_geometry_ptr_)) {
+        editing_geometry_renderer_ptr_ = std::make_shared<glsl::ImageRenderer>();
+        if (!editing_geometry_renderer_ptr_->AddGeometry(editing_geometry_ptr_)) {
             return false;
         }
     } else {
@@ -174,8 +161,12 @@ void VisualizerWithEditing::PrintVisualizerHelp() {
     utility::LogInfo("    Y            : Enter orthogonal view along Y axis, press again to flip.");
     utility::LogInfo("    Z            : Enter orthogonal view along Z axis, press again to flip.");
     utility::LogInfo("    K/E          : Lock / unlock camera.");
+    utility::LogInfo("    G            : Enter / Exit selection mode");
     utility::LogInfo("    Ctrl + D     : Downsample point cloud with a voxel grid.");
     utility::LogInfo("    Ctrl + R     : Reset geometry to its initial state.");
+    utility::LogInfo("    Ctrl + Z     : Undo latest editing.");
+    utility::LogInfo("    Ctrl + S     : Save editing geometry to file.");
+    utility::LogInfo("    Ctrl + F     : Print point cloud points");
     utility::LogInfo("    Shift + +/-  : Increase/decrease picked point size..");
     utility::LogInfo("    Shift + mouse left button   : Pick a point and add in queue.");
     utility::LogInfo("    Shift + mouse right button  : Remove last picked point from queue.");
@@ -187,10 +178,11 @@ void VisualizerWithEditing::PrintVisualizerHelp() {
     utility::LogInfo("                                  button to remove point. Release Ctrl key to");
     utility::LogInfo("                                  close the polygon.");
     utility::LogInfo("    ESC                         : Unlock camera.");
-    utility::LogInfo("    C                           : Crop the geometry with selection region.");
-    utility::LogInfo("    X                           : Remove points within selection region.");
-    utility::LogInfo("    Ctrl + S                    : Save editing geometry to file.");
-    utility::LogInfo("    Ctrl + Z                    : Undo latest cropping.");
+    utility::LogInfo("    -- When entering selection mode --");
+    utility::LogInfo("    F            : Select a plane, requires at least 3 picked points");
+    utility::LogInfo("    -- When camera is locked or entered selection mode --");
+    utility::LogInfo("    C            : Crop the geometry with selection region.");
+    utility::LogInfo("    X            : Remove points within selection region.");
     utility::LogInfo("");
     // clang-format on
 }
@@ -319,7 +311,13 @@ bool VisualizerWithEditing::InitViewControl() {
 void VisualizerWithEditing::UpdateBackground() {
     auto &bg = GetRenderOption().background_color_;
     auto &view_control = (ViewControlWithEditing &)(*view_control_ptr_);
-    if (view_control.IsLocked()) {
+    if (select_editing_) {
+        // 96, 109, 114
+        bg[0] = 96.0/255.0;
+        bg[1] = 109.0/255.0;
+        bg[2] = 114.0/255.0;
+    }
+    else if (view_control.IsLocked()) {
         bg[0] = 0;
         bg[1] = 0.5;
         bg[2] = 0.5;
@@ -371,36 +369,53 @@ void VisualizerWithEditing::Save() {
         SaveCroppingResult(filename);
     }
 }
-
-void VisualizerWithEditing::Crop(bool strip) {
-    auto &view_control = (ViewControlWithEditing &)(*view_control_ptr_);
+std::shared_ptr<geometry::Geometry> VisualizerWithEditing::Crop(std::vector<size_t> &indexes,
+                                 bool del /* del = true indicates indexes should be deleted */
+                                 ) {
     if (editing_geometry_ptr_ &&
         editing_geometry_ptr_->GetGeometryType() ==
-                geometry::Geometry::GeometryType::PointCloud) {
-        glfwMakeContextCurrent(window_);
+        geometry::Geometry::GeometryType::PointCloud) {
         auto &pcd = (geometry::PointCloud &)*editing_geometry_ptr_;
-        auto index =
-                selection_polygon_ptr_->CropPointCloudIndex(pcd, view_control);
-        auto discard = pcd.SelectByIndex(index, !strip);
-        discarded_geometries_.push_back(discard);
-        pcd = *pcd.SelectByIndex(index, strip);
+        auto keep = pcd.SelectByIndex(indexes, del);
+        auto left = pcd.SelectByIndex(indexes, !del);
+        pcd = *keep;
         editing_geometry_renderer_ptr_->UpdateGeometry();
-        InvalidateSelectionPolygon();
-        InvalidatePicking();
+        return left;
+    } else if (editing_geometry_ptr_ &&
+               editing_geometry_ptr_->GetGeometryType() ==
+               geometry::Geometry::GeometryType::TriangleMesh) {
+        auto &mesh = (geometry::TriangleMesh &)*editing_geometry_ptr_;
+        auto keep = mesh.SelectByIndex(indexes, del);
+        auto left = mesh.SelectByIndex(indexes, !del);
+        mesh = *keep;
+        editing_geometry_renderer_ptr_->UpdateGeometry();
+        return left;
+    }
+    return nullptr;
+}
+
+void VisualizerWithEditing::Crop(bool del) {
+    glfwMakeContextCurrent(window_);
+    std::vector<size_t> indexes;
+    auto &view_control = (ViewControlWithEditing &)(*view_control_ptr_);
+    if (editing_geometry_ptr_ &&
+        editing_geometry_ptr_->GetGeometryType() == geometry::Geometry::GeometryType::PointCloud) {
+        auto &pcd = (geometry::PointCloud &)*editing_geometry_ptr_;
+        indexes = selection_polygon_ptr_->CropPointCloudIndex(pcd, view_control);
     } else if (editing_geometry_ptr_ &&
                editing_geometry_ptr_->GetGeometryType() ==
                        geometry::Geometry::GeometryType::TriangleMesh) {
-        glfwMakeContextCurrent(window_);
         auto &mesh = (geometry::TriangleMesh &)*editing_geometry_ptr_;
-        auto index = selection_polygon_ptr_->CropTriangleMeshIndex(
-                mesh, view_control);
-        auto discard = mesh.SelectByIndex(index, strip);
-        discarded_geometries_.push_back(discard);
-        mesh = *mesh.SelectByIndex(index, !strip);
-        editing_geometry_renderer_ptr_->UpdateGeometry();
-        InvalidateSelectionPolygon();
-        InvalidatePicking();
+        indexes = selection_polygon_ptr_->CropTriangleMeshIndex(mesh, view_control);
     }
+    if (!indexes.empty()) {
+        auto geo = Crop(indexes, del);
+        if (geo) {
+            discarded_geometries_.push_back(geo);
+        }
+    }
+    InvalidateSelectionPolygon();
+    InvalidatePicking();
 }
 void VisualizerWithEditing::KeyPressCallback(
         GLFWwindow *window, int key, int scancode, int action, int mods) {
@@ -429,10 +444,54 @@ void VisualizerWithEditing::KeyPressCallback(
     }
 
     switch (key) {
+        case GLFW_KEY_G:
+            if (!view_control.IsLocked()) {
+                if (!select_editing_) {
+                    utility::LogInfo("Enter select-editing");
+                    select_editing_ = true;
+                    Backup();
+                    UpdateBackground();
+                } else {
+                    ExitSelectEdit();
+                }
+            }
+            break;
+        case GLFW_KEY_ENTER:
+            Visualizer::KeyPressCallback(window, key, scancode, action, mods);
+            break;
+
         case GLFW_KEY_F:
-            view_control.SetEditingMode(
-                    ViewControlWithEditing::EditingMode::FreeMode);
-            utility::LogDebug("[Visualizer] Enter freeview mode.");
+            if (mods & GLFW_MOD_CONTROL) {
+                if (editing_geometry_ptr_ &&
+                        editing_geometry_ptr_->GetGeometryType() == geometry::Geometry::GeometryType::PointCloud) {
+                    auto &pcd = (geometry::PointCloud &)*editing_geometry_ptr_;
+                    utility::LogInfo("current editing point cloud has {} points", pcd.points_.size());
+                }
+                if (original_geometry_ptr_ &&
+                    original_geometry_ptr_->GetGeometryType() == geometry::Geometry::GeometryType::PointCloud) {
+                    auto &pcd = (geometry::PointCloud &)*original_geometry_ptr_;
+                    utility::LogInfo("original editing point cloud has {} points", pcd.points_.size());
+                }
+                for (auto i = 0u; i < selected_geometries_.size(); i++) {
+                    auto geo = selected_geometries_[i];
+                    if (geo && geo->GetGeometryType() == geometry::Geometry::GeometryType::PointCloud) {
+                        auto &pcd = (geometry::PointCloud &)*geo;
+                        utility::LogInfo("selected point cloud {} has {} points", i, pcd.points_.size());
+                    }
+                }
+                for (auto i = 0u; i < discarded_geometries_.size(); i++) {
+                    auto geo = discarded_geometries_[i];
+                    if (geo && geo->GetGeometryType() == geometry::Geometry::GeometryType::PointCloud) {
+                        auto &pcd = (geometry::PointCloud &)*geo;
+                        utility::LogInfo("history point cloud {} has {} points", i, pcd.points_.size());
+                    }
+                }
+            } else if (select_editing_) {
+                FitPlane();
+            } else {
+                view_control.SetEditingMode(ViewControlWithEditing::EditingMode::FreeMode);
+                utility::LogDebug("[Visualizer] Enter freeview mode.");
+            }
             break;
         case GLFW_KEY_S:
             if (mods & GLFW_MOD_CONTROL) {
@@ -443,7 +502,9 @@ void VisualizerWithEditing::KeyPressCallback(
             }
             break;
         case GLFW_KEY_X:
-            if (view_control.IsLocked()) {
+            if (select_editing_) {
+                CropSelected(true);
+            } else if (view_control.IsLocked()) {
                 if (selection_polygon_ptr_) {
                     Crop(true);
                 } else {
@@ -461,9 +522,7 @@ void VisualizerWithEditing::KeyPressCallback(
             break;
         case GLFW_KEY_Z:
             if (mods & GLFW_MOD_CONTROL) {
-                if (view_control.IsLocked()) {
-                    Undo();
-                }
+                Undo();
             } else {
                 view_control.ToggleEditingZ();
                 utility::LogDebug(
@@ -471,7 +530,9 @@ void VisualizerWithEditing::KeyPressCallback(
             }
             break;
         case GLFW_KEY_ESCAPE:
-            if (view_control.IsLocked()) {
+            if (select_editing_) {
+                ExitSelectEdit();
+            } else if (view_control.IsLocked()) {
                 view_control.ToggleLocking();
                 InvalidateSelectionPolygon();
                 UpdateBackground();
@@ -479,11 +540,13 @@ void VisualizerWithEditing::KeyPressCallback(
             break;
         case GLFW_KEY_E:
         case GLFW_KEY_K: {
-            view_control.ToggleLocking();
-            InvalidateSelectionPolygon();
-            utility::LogDebug("[Visualizer] Camera %s.",
-                              view_control.IsLocked() ? "Lock" : "Unlock");
-            UpdateBackground();
+            if (!select_editing_) {
+                view_control.ToggleLocking();
+                InvalidateSelectionPolygon();
+                utility::LogDebug("[Visualizer] Camera %s.",
+                                  view_control.IsLocked() ? "Lock" : "Unlock");
+                UpdateBackground();
+            }
             break;
         }
         case GLFW_KEY_R:
@@ -501,10 +564,11 @@ void VisualizerWithEditing::KeyPressCallback(
                 if (voxel_size_ > 0.0 && editing_geometry_ptr_ &&
                     editing_geometry_ptr_->GetGeometryType() ==
                             geometry::Geometry::GeometryType::PointCloud) {
-                    utility::LogInfo("Voxel downsample with voxel size {:.4f}.",
-                                     voxel_size_);
                     auto &pcd = (geometry::PointCloud &)*editing_geometry_ptr_;
+                    utility::LogInfo("Voxel downsample with voxel size {:.4f}, point size {}.",
+                                     voxel_size_, pcd.points_.size());
                     pcd = *pcd.VoxelDownSample(voxel_size_);
+                    utility::LogInfo("After voxel downsample, point size {}.", pcd.points_.size());
                     UpdateGeometry();
                 } else {
                     utility::LogWarning(
@@ -517,7 +581,9 @@ void VisualizerWithEditing::KeyPressCallback(
             }
             break;
         case GLFW_KEY_C:
-            if (view_control.IsLocked() && selection_polygon_ptr_ &&
+            if (select_editing_) {
+                CropSelected(false);
+            } else if (view_control.IsLocked() && selection_polygon_ptr_ &&
                 !selection_polygon_ptr_->IsEmpty()) {
                 Crop(false);
             } else {
@@ -599,8 +665,7 @@ void VisualizerWithEditing::MouseButtonCallback(GLFWwindow *window,
                                                 int action,
                                                 int mods) {
     auto &view_control = (ViewControlWithEditing &)(*view_control_ptr_);
-    if (view_control.IsLocked() && selection_polygon_ptr_ &&
-        selection_polygon_renderer_ptr_) {
+    if (view_control.IsLocked() && selection_polygon_ptr_ && selection_polygon_renderer_ptr_) {
         if (button == GLFW_MOUSE_BUTTON_LEFT) {
             double x, y;
             glfwGetCursorPos(window, &x, &y);
@@ -673,8 +738,7 @@ void VisualizerWithEditing::MouseButtonCallback(GLFWwindow *window,
             }
         }
     } else {
-        if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE &&
-            (mods & GLFW_MOD_SHIFT)) {
+        if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE && (mods & GLFW_MOD_SHIFT)) {
             double x, y;
             glfwGetCursorPos(window, &x, &y);
 #ifdef __APPLE__
@@ -696,8 +760,7 @@ void VisualizerWithEditing::MouseButtonCallback(GLFWwindow *window,
                         (size_t)index);
                 is_redraw_required_ = true;
             }
-        } else if (button == GLFW_MOUSE_BUTTON_RIGHT &&
-                   action == GLFW_RELEASE && (mods & GLFW_MOD_SHIFT)) {
+        } else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE && (mods & GLFW_MOD_SHIFT)) {
             if (!pointcloud_picker_ptr_->picked_indices_.empty()) {
                 utility::LogInfo(
                         "Remove picked point #{} from pick queue.",
@@ -750,6 +813,180 @@ void VisualizerWithEditing::SaveCroppingResult(
             volume_filename,
             *selection_polygon_ptr_->CreateSelectionPolygonVolume(
                     GetViewControl()));
+}
+void VisualizerWithEditing::Backup() {
+    if (editing_geometry_ptr_->GetGeometryType() == geometry::Geometry::GeometryType::PointCloud) {
+        auto pcd = std::make_shared<geometry::PointCloud>();
+        *pcd = (geometry::PointCloud &)*editing_geometry_ptr_;
+    }
+}
+void VisualizerWithEditing::ExitSelectEdit() {
+    if (!select_editing_) {
+        return;
+    }
+    glfwMakeContextCurrent(window_);
+    utility::LogInfo("Exit select-editing");
+    select_editing_ = false;
+    auto &pcd = (geometry::PointCloud&)*editing_geometry_ptr_;
+    for (auto &geo : selected_original_geometries_) {
+        pcd += (geometry::PointCloud&)*geo;
+    }
+    for (auto &geo : selected_geometries_) {
+        RemoveGeometry(geo, false);
+    }
+    selected_geometries_.clear();
+    selected_original_geometries_.clear();
+    editing_geometry_renderer_ptr_->UpdateGeometry();
+
+    InvalidateSelectionPolygon();
+    InvalidatePicking();
+    UpdateBackground();
+}
+//def dist2plane(x,plane_model):
+//    # dist2plane = lambda x: plane_model[0]*x[0] + plane_model[1]*x[1] + plane_model[2]*x[2] + plane_model[3]
+//    return (plane_model[0]*x[0] + plane_model[1]*x[1] + plane_model[2]*x[2] + plane_model[3])
+
+// def nearest2plane(pts, plane_model, threshold=1, viz=False):
+//    idx_inside = [abs(dist2plane(x, plane_model)) < threshold for x in pts]
+//    idx_inside = np.flatnonzero(idx_inside)
+//
+// idx_inside = utils3d.nearest2plane(np.asarray(pcd_std.points),
+//                                    plane_model, threshold=distance_threshold, viz=True)
+void VisualizerWithEditing::FitPlane() {
+    auto &picked = GetPickedPoints();
+    if (picked.size() < 3) {
+        utility::LogInfo("Plane segment requires at least 3 points selected");
+        return;
+    }
+    if (editing_geometry_ptr_->GetGeometryType() == geometry::Geometry::GeometryType::PointCloud) {
+        auto &pcd = (geometry::PointCloud &)*editing_geometry_ptr_;
+        if (pcd.points_.size() > 40 * 10000) {
+            utility::LogInfo("Current point cloud contains {} points, it will be too slow to fit a plane, please downsample it.", pcd.points_.size());
+            return;
+        }
+        auto sel = pcd.SelectByIndex(picked);
+        double distance = 3.0;
+        int ransac_n = 3;
+        int iteration = 500;
+        utility::LogDebug("segment plane");
+        auto tp = sel->SegmentPlane(distance, ransac_n, iteration);
+        auto plane = std::get<0>(tp);
+
+        utility::LogDebug("find plane");
+        std::vector<size_t> inside; // indices on plane
+        for (auto i = 0u; i < pcd.points_.size(); i++) {
+            auto &p = pcd.points_[i];
+            auto dist = p[0] * plane[0] + p[1] * plane[1] + p[2] * plane[2] + plane[3];
+            if (fabs(dist) < distance) {
+                inside.push_back(i);
+            }
+        }
+        if (inside.empty()) {
+            utility::LogInfo("find nothing");
+            InvalidatePicking();
+            return;
+        }
+
+        utility::LogDebug("dbscan");
+        // filtered is all points in editing geometry that is close to the plane
+        auto filtered = pcd.SelectByIndex(inside);
+        // dbscan to label clusters, labels contains a vector with same size of filter.points_
+        // and value >= 0 indicates it belongs to a point cluster whose sequence is value
+        auto labels = filtered->ClusterDBSCAN(10, 30, true);
+        auto max = *std::max_element(labels.begin(), labels.end());
+        utility::LogDebug("dbscan max {}", max);
+        // cluster_indices contains a group of cluster, which defines index in editing geometry(NOT filter)
+        std::vector<std::vector<size_t>> cluster_indices;
+        cluster_indices.resize(max+1);
+        for (auto idx = 0u; idx < labels.size(); idx++) {
+            auto label = labels[idx];
+            if (label >= 0) {
+                // turn index of filter to index of editing geometry
+                cluster_indices[label].push_back(inside[idx]);
+            }
+        }
+
+        utility::LogDebug("merge");
+        std::vector<size_t> merged_indices;
+        for (auto &v : cluster_indices) {
+            if (v.empty()) {
+                continue;
+            }
+            // check if picked indexes inside this one
+            bool found = false;
+            for (auto k : v) {
+                auto &p = pcd.points_[k];
+                for (auto &pick : sel->points_) {
+                    if (pick == p) {
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if (found) {
+                merged_indices.reserve(merged_indices.size() + v.size());
+                merged_indices.insert(merged_indices.end(), v.begin(), v.end());
+            }
+        }
+
+        utility::LogDebug("crop");
+        // crop from current editing geometry, the cropped part will be saved to selection histroy
+        auto geo = std::dynamic_pointer_cast<geometry::PointCloud>(Crop(merged_indices, true));
+        if (geo && geo->HasPoints()) {
+            // copy and save cropped geo with original color
+            auto orig = std::make_shared<geometry::PointCloud>();
+            *orig = *geo;
+            selected_original_geometries_.push_back(orig);
+
+            // paint selected cloud with green for rendering
+            geo->PaintUniformColor({0, 1, 0});
+            Visualizer::AddGeometry(geo, false);
+            selected_geometries_.push_back(geo);
+        }
+    }
+    is_redraw_required_ = true;
+    InvalidatePicking();
+}
+
+void VisualizerWithEditing::CropSelected(bool del /* del = true indicates indexes should be deleted */ ) {
+    if (selected_geometries_.empty()) {
+        return;
+    }
+
+    glfwMakeContextCurrent(window_);
+    if (editing_geometry_ptr_ &&
+        editing_geometry_ptr_->GetGeometryType() == geometry::Geometry::GeometryType::PointCloud) {
+        auto &pcd = (geometry::PointCloud &)*editing_geometry_ptr_;
+
+        // merge selection
+        auto selected = std::make_shared<geometry::PointCloud>(); // merged selected geometry
+        for (auto &geo : selected_original_geometries_) {
+            auto &cloud = (geometry::PointCloud&)*geo;
+            *selected += cloud;
+        }
+        for (auto &geo : selected_geometries_) {
+            RemoveGeometry(geo, false);
+        }
+        selected_geometries_.clear();
+        selected_original_geometries_.clear();
+
+        // collected deleted part and push to history
+        auto deleted = std::make_shared<geometry::PointCloud>();
+        if (!del) {
+            // delete current editing, make selection being editing
+            *deleted = pcd;
+            pcd = *selected;
+            editing_geometry_renderer_ptr_->UpdateGeometry();
+        } else {
+            // delete selected, keep editing unchanged
+            deleted = selected;
+        }
+        if (deleted->HasPoints()) {
+            discarded_geometries_.push_back(deleted);
+        }
+    }
+    InvalidateSelectionPolygon();
+    InvalidatePicking();
 }
 
 }  // namespace visualization

@@ -7,8 +7,8 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    visualization::VisualizerWithEditing vis;
-    vis.CreateVisualizerWindow("Crop Point Cloud", 1920, 1080, 100, 100);
+    visualization::VisualizerWithEditing vis(1);
+    vis.CreateVisualizerWindow("VisualEdit", 1920, 1080, 100, 100);
     auto pcd_ptr = io::CreatePointCloudFromFile(argv[1]);
     if (pcd_ptr->IsEmpty()) {
         utility::LogWarning("Failed to read the point cloud.");

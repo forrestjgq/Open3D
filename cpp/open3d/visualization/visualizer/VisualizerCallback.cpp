@@ -158,7 +158,6 @@ void Visualizer::KeyPressCallback(
                 CopyViewStatusFromClipboard();
             }
             break;
-        case GLFW_KEY_ESCAPE:
         case GLFW_KEY_Q:
             Close();
             break;
