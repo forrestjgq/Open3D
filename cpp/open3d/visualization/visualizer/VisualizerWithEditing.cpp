@@ -1133,5 +1133,20 @@ void VisualizerWithEditing::CropSelected(bool del /* del = true indicates indexe
     InvalidatePicking();
 }
 
+void VisualizerWithEditing::WindowCloseCallback(GLFWwindow *window) {
+    OnExit();
+}
+void VisualizerWithEditing::OnExit() {
+    utility::LogInfo("Exit, merge selections {}", select_editing_);
+    if (select_editing_) {
+        select_editing_ = false;
+        auto &pcd = (geometry::PointCloud&)*editing_geometry_ptr_;
+        for (auto &geo : selected_original_geometries_) {
+            pcd += (geometry::PointCloud&)*geo;
+        }
+        selected_geometries_.clear();
+        selected_original_geometries_.clear();
+    }
+}
 }  // namespace visualization
 }  // namespace open3d

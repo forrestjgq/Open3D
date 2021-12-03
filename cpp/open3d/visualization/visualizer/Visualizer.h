@@ -265,6 +265,7 @@ protected:
             GLFWwindow *window, int key, int scancode, int action, int mods);
     /// \brief Function to notify the window to be closed.
     virtual void WindowCloseCallback(GLFWwindow *window);
+    virtual void OnExit();
 
 protected:
     // window

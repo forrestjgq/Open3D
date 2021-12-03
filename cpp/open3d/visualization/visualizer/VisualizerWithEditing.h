@@ -101,6 +101,8 @@ protected:
     void Undo();
     void UpdateBackground();
 
+    void WindowCloseCallback(GLFWwindow *window) override;
+    void OnExit() override;
 protected:
     std::shared_ptr<SelectionPolygon> selection_polygon_ptr_;
     std::shared_ptr<glsl::SelectionPolygonRenderer>

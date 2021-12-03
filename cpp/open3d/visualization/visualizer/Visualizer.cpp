@@ -279,6 +279,7 @@ void Visualizer::Run() {
             UpdateRender();
         }
     }
+    OnExit();
 }
 
 void Visualizer::Close() {

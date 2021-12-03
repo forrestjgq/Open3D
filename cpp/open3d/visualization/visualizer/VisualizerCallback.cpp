@@ -365,5 +365,8 @@ void Visualizer::WindowCloseCallback(GLFWwindow *window) {
     // happens when user click the close icon to close the window
 }
 
+void Visualizer::OnExit() {
+
+}
 }  // namespace visualization
 }  // namespace open3d
