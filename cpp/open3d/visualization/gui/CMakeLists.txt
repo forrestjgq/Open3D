@@ -20,6 +20,7 @@ set(GUI_SOURCE_FILES
     Label3D.cpp
     Layout.cpp
     ListView.cpp
+    MultiSelectListView.cpp
     Menu.cpp
     MenuImgui.cpp
     NumberEdit.cpp

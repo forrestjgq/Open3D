@@ -32,6 +32,7 @@
 #include "open3d/geometry/LineSet.h"
 #include "open3d/geometry/PointCloud.h"
 #include "open3d/geometry/TriangleMesh.h"
+#include "open3d/geometry/KDTreeFlann.h"
 #include "open3d/io/IJsonConvertibleIO.h"
 #include "open3d/io/PointCloudIO.h"
 #include "open3d/io/TriangleMeshIO.h"
@@ -447,7 +448,8 @@ void VisualizerWithEditing::KeyPressCallback(
         case GLFW_KEY_G:
             if (!view_control.IsLocked()) {
                 if (!select_editing_) {
-                    utility::LogInfo("Enter select-editing");
+                    utility::LogInfo("Enter select-editing, you may select some points before editing");
+                    PointSelectionHint();
                     select_editing_ = true;
                     Backup();
                     UpdateBackground();
@@ -591,12 +593,18 @@ void VisualizerWithEditing::KeyPressCallback(
                                              mods);
             }
             break;
+        case GLFW_KEY_N:
+            if (select_editing_) {
+                FindNeighborWithSimilarNormals();
+            } else {
+                Visualizer::KeyPressCallback(window, key, scancode, action, mods);
+            }
+            break;
         case GLFW_KEY_MINUS:
             if (mods & GLFW_MOD_SHIFT) {
                 option.DecreaseSphereSize();
             } else {
-                Visualizer::KeyPressCallback(window, key, scancode, action,
-                                             mods);
+                Visualizer::KeyPressCallback(window, key, scancode, action, mods);
             }
             break;
         case GLFW_KEY_EQUAL:
@@ -758,7 +766,9 @@ void VisualizerWithEditing::MouseButtonCallback(GLFWwindow *window,
                         index, point(0), point(1), point(2));
                 pointcloud_picker_ptr_->picked_indices_.push_back(
                         (size_t)index);
+
                 is_redraw_required_ = true;
+                PointSelectionHint();
             }
         } else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE && (mods & GLFW_MOD_SHIFT)) {
             if (!pointcloud_picker_ptr_->picked_indices_.empty()) {
@@ -767,12 +777,29 @@ void VisualizerWithEditing::MouseButtonCallback(GLFWwindow *window,
                         pointcloud_picker_ptr_->picked_indices_.back());
                 pointcloud_picker_ptr_->picked_indices_.pop_back();
                 is_redraw_required_ = true;
+                PointSelectionHint();
             }
         }
         Visualizer::MouseButtonCallback(window, button, action, mods);
     }
 }
 
+void VisualizerWithEditing::PointSelectionHint() {
+    if (!select_editing_) {
+        return;
+    }
+    std::string hint;
+    auto sz = GetPickedPoints().size();
+    if (sz >= 3) {
+        hint += "Press <F> to find a plane ";
+    }
+    if (sz > 0) {
+        hint += "Press <N> to find neighbors with similar normals ";
+    }
+    if (hint.length() > 0) {
+        utility::LogInfo(hint.c_str());
+    }
+}
 void VisualizerWithEditing::InvalidateSelectionPolygon() {
     if (selection_polygon_ptr_) selection_polygon_ptr_->Clear();
     if (selection_polygon_renderer_ptr_) {
@@ -842,6 +869,123 @@ void VisualizerWithEditing::ExitSelectEdit() {
     InvalidatePicking();
     UpdateBackground();
 }
+void VisualizerWithEditing::FindNeighborWithSimilarNormals() {
+    auto &picked = GetPickedPoints();
+    if (picked.size() < 1) {
+        utility::LogInfo("Magic wand requires at least 1 points selected");
+        return;
+    }
+    if (editing_geometry_ptr_->GetGeometryType() != geometry::Geometry::GeometryType::PointCloud) {
+        utility::LogInfo("Magic wand works only on point cloud");
+        return;
+    }
+    auto pcd = std::dynamic_pointer_cast<geometry::PointCloud>(editing_geometry_ptr_);
+    if (pcd->points_.size() > 100 * 10000) {
+        utility::LogInfo("Current point cloud contains {} points, it will be too slow to fit a plane, please downsample it.", pcd->points_.size());
+        return;
+    }
+    if (!pcd->HasNormals()) {
+        utility::LogInfo("Estimate normals, this will take a long time");
+        pcd->EstimateNormals(geometry::KDTreeSearchParamHybrid(10, 30));
+        pcd->OrientNormalsConsistentTangentPlane(30);
+    }
+    geometry::KDTreeFlann tree(*pcd);
+    double maxRadius = 50; // mm
+
+    std::atomic_int cnt;  // used to record fail count
+
+    // indices we want for each picked point
+    std::vector<std::vector<int>> indices;
+    indices.resize(picked.size());
+
+    utility::LogInfo("Search radius");
+    // idx_pts_nei = [p for i in ids_pts_picked
+    //                     for p in tree_pcd.search_radius_vector_3d(pcd_std.points[i], radius=max_radius)[1]
+    //                ]
+#pragma omp parallel for schedule(static) shared(indices)
+    for (auto i = 0u; i < picked.size(); i++) {
+        std::vector<double> distance;
+        auto k = tree.SearchRadius(pcd->points_[picked[i]], maxRadius, indices[i], distance);
+        if (k < 0) {
+            cnt++; // fail
+        }
+    }
+
+    if (cnt.load() > 0) {
+        utility::LogWarning("Search radius fails");
+        is_redraw_required_ = true;
+        InvalidatePicking();
+        return;
+    }
+
+    // merge distances to distance[0]
+    for (auto i = 1u; i < indices.size(); i++) {
+        indices[0].insert(indices[0].end(), indices[i].begin(), indices[i].end());
+    }
+#if 1
+    std::vector<size_t> selected_indices(indices[0].size());
+    for (auto i = 0u; i < indices[0].size(); i++) {
+        selected_indices[i] = indices[0][i];
+    }
+#else
+
+    // nrm_nei = np.asarray(pcd_std.normals)[idx_pts_nei,:]
+    auto &idx_pts_nei = indices[0];
+    std::vector<Eigen::Vector3d> nrm_nei;
+    nrm_nei.resize(idx_pts_nei.size());
+    for (auto i = 0u; i < idx_pts_nei.size(); i++) {
+        nrm_nei[i] = pcd->normals_[idx_pts_nei[i]];
+    }
+
+    // nrm = np.asarray(pcd_sel.normals)[0]
+    auto sel = pcd->SelectByIndex(picked);
+    auto nrm = sel->normals_[0];
+
+    //cs = np.inner(nrm,nrm_nei)
+    // cs = np.clip(cs,-1,1)
+    // ang = np.arccos(cs) / np.pi * 180
+    std::vector<double> cs(nrm_nei.size());
+    std::vector<double> ang(nrm_nei.size());
+    const double pi = 3.141592653589793;
+    const double g = 180/pi;
+
+#pragma omp parallel for schedule(static)
+    for (auto i = 0u; i < nrm_nei.size(); i++) {
+        auto &v = nrm_nei[i];
+        auto r = nrm[0] * v[0] + nrm[1] * v[1] + nrm[2] * v[2];
+        if (r < -1.0) {
+            r = -1.0;
+        } else if (r > 1.0) {
+            r = 1.0;
+        }
+        cs[i] = r;
+        ang[i] = std::acos(r) * g;
+    }
+    std::vector<size_t> res;
+    auto th_ang = 20; // degrees
+    // similar
+    for (auto i = 0u; i < ang.size(); i++) {
+        if (fabs(ang[i]) < th_ang) {
+            res.push_back(idx_pts_nei[i]);
+        }
+    }
+#endif
+    // crop from current editing geometry, the cropped part will be saved to selection histroy
+    auto geo = std::dynamic_pointer_cast<geometry::PointCloud>(Crop(selected_indices, true));
+    if (geo && geo->HasPoints()) {
+        // copy and save cropped geo with original color
+        auto orig = std::make_shared<geometry::PointCloud>();
+        *orig = *geo;
+        selected_original_geometries_.push_back(orig);
+
+        // paint selected cloud with green for rendering
+        geo->PaintUniformColor({0, 1, 0});
+        Visualizer::AddGeometry(geo, false);
+        selected_geometries_.push_back(geo);
+    }
+    is_redraw_required_ = true;
+    InvalidatePicking();
+}
 //def dist2plane(x,plane_model):
 //    # dist2plane = lambda x: plane_model[0]*x[0] + plane_model[1]*x[1] + plane_model[2]*x[2] + plane_model[3]
 //    return (plane_model[0]*x[0] + plane_model[1]*x[1] + plane_model[2]*x[2] + plane_model[3])
@@ -860,7 +1004,7 @@ void VisualizerWithEditing::FitPlane() {
     }
     if (editing_geometry_ptr_->GetGeometryType() == geometry::Geometry::GeometryType::PointCloud) {
         auto &pcd = (geometry::PointCloud &)*editing_geometry_ptr_;
-        if (pcd.points_.size() > 40 * 10000) {
+        if (pcd.points_.size() > 30 * 10000) {
             utility::LogInfo("Current point cloud contains {} points, it will be too slow to fit a plane, please downsample it.", pcd.points_.size());
             return;
         }
@@ -868,11 +1012,11 @@ void VisualizerWithEditing::FitPlane() {
         double distance = 3.0;
         int ransac_n = 3;
         int iteration = 500;
-        utility::LogDebug("segment plane");
+        utility::LogInfo("segment plane");
         auto tp = sel->SegmentPlane(distance, ransac_n, iteration);
         auto plane = std::get<0>(tp);
 
-        utility::LogDebug("find plane");
+        utility::LogInfo("find plane");
         std::vector<size_t> inside; // indices on plane
         for (auto i = 0u; i < pcd.points_.size(); i++) {
             auto &p = pcd.points_[i];
@@ -887,14 +1031,14 @@ void VisualizerWithEditing::FitPlane() {
             return;
         }
 
-        utility::LogDebug("dbscan");
+        utility::LogInfo("dbscan");
         // filtered is all points in editing geometry that is close to the plane
         auto filtered = pcd.SelectByIndex(inside);
         // dbscan to label clusters, labels contains a vector with same size of filter.points_
         // and value >= 0 indicates it belongs to a point cluster whose sequence is value
         auto labels = filtered->ClusterDBSCAN(10, 30, true);
         auto max = *std::max_element(labels.begin(), labels.end());
-        utility::LogDebug("dbscan max {}", max);
+        utility::LogInfo("dbscan max {}", max);
         // cluster_indices contains a group of cluster, which defines index in editing geometry(NOT filter)
         std::vector<std::vector<size_t>> cluster_indices;
         cluster_indices.resize(max+1);
@@ -906,7 +1050,7 @@ void VisualizerWithEditing::FitPlane() {
             }
         }
 
-        utility::LogDebug("merge");
+        utility::LogInfo("merge");
         std::vector<size_t> merged_indices;
         for (auto &v : cluster_indices) {
             if (v.empty()) {
@@ -929,7 +1073,7 @@ void VisualizerWithEditing::FitPlane() {
             }
         }
 
-        utility::LogDebug("crop");
+        utility::LogInfo("crop");
         // crop from current editing geometry, the cropped part will be saved to selection histroy
         auto geo = std::dynamic_pointer_cast<geometry::PointCloud>(Crop(merged_indices, true));
         if (geo && geo->HasPoints()) {

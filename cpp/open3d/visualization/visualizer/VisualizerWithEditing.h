@@ -93,6 +93,8 @@ protected:
     );
     void Backup();
     void FitPlane();
+    void FindNeighborWithSimilarNormals();
+    void PointSelectionHint();
     void ExitSelectEdit();
     void CropSelected(bool del);
     void Save();

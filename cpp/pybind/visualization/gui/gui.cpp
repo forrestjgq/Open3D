@@ -46,6 +46,7 @@
 #include "open3d/visualization/gui/Label3D.h"
 #include "open3d/visualization/gui/Layout.h"
 #include "open3d/visualization/gui/ListView.h"
+#include "open3d/visualization/gui/MultiSelectListView.h"
 #include "open3d/visualization/gui/NumberEdit.h"
 #include "open3d/visualization/gui/ProgressBar.h"
 #include "open3d/visualization/gui/SceneWidget.h"
@@ -972,6 +973,30 @@ void pybind_gui_classes(py::module &m) {
                                    "The text of the currently selected item")
             .def("set_on_selection_changed", &ListView::SetOnValueChanged,
                  "Calls f(new_val, is_double_click) when user changes "
+                 "selection");
+
+    // ---- MultiSelectListView ----
+    py::class_<MultiSelectListView, UnownedPointer<MultiSelectListView>, Widget> mslistview(
+            m, "MultiSelectListView", "Displays a multiple selected list of text");
+    mslistview.def(py::init<>(), "Creates an empty list")
+            .def("__repr__",
+                 [](const MultiSelectListView &lv) {
+                     std::stringstream s;
+                     s << "Label (" << lv.GetFrame().x << ", "
+                       << lv.GetFrame().y << "), " << lv.GetFrame().width
+                       << " x " << lv.GetFrame().height;
+                     return s.str();
+                 })
+            .def("set_items", &MultiSelectListView::SetItems,
+                 "Sets the list to display the list of items provided")
+            .def("get_selected_indices", &MultiSelectListView::GetSelectedIndices,
+                 "Get indices of all selected items")
+            .def("set_selected_index", &MultiSelectListView::SetSelectedIndex,
+                 "Set selected status of an item")
+            .def("get_value", &MultiSelectListView::GetValue,
+                 "Get text of an item")
+            .def("set_on_selection_changed", &MultiSelectListView::SetOnValueChanged,
+                 "Calls f(index, new_val, is_double_click) when user changes "
                  "selection");
 
     // ---- NumberEdit ----

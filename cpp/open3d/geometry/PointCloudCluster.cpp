@@ -33,6 +33,7 @@
 
 namespace open3d {
 namespace geometry {
+#define PROGRESSBAR 1
 
 std::vector<int> PointCloud::ClusterDBSCAN(double eps,
                                            size_t min_points,
@@ -40,9 +41,13 @@ std::vector<int> PointCloud::ClusterDBSCAN(double eps,
     KDTreeFlann kdtree(*this);
 
     // Precompute all neighbors.
-    utility::LogDebug("Precompute neighbors.");
+    utility::LogInfo("Precompute neighbors-host.");
+#if PROGRESSBAR
     utility::ConsoleProgressBar progress_bar(
             points_.size(), "Precompute neighbors.", print_progress);
+#else
+    int progress_bar = 0;
+#endif
     std::vector<std::vector<int>> nbs(points_.size());
 #pragma omp parallel for schedule(static)
     for (int idx = 0; idx < int(points_.size()); ++idx) {
@@ -52,11 +57,13 @@ std::vector<int> PointCloud::ClusterDBSCAN(double eps,
 #pragma omp critical
         { ++progress_bar; }
     }
-    utility::LogDebug("Done Precompute neighbors.");
+    utility::LogInfo("Done Precompute neighbors.");
 
     // Set all labels to undefined (-2).
-    utility::LogDebug("Compute Clusters");
+    utility::LogInfo("Compute Clusters");
+#if PROGRESSBAR
     progress_bar.Reset(points_.size(), "Clustering", print_progress);
+#endif
     std::vector<int> labels(points_.size(), -2);
     int cluster_label = 0;
     for (size_t idx = 0; idx < points_.size(); ++idx) {
@@ -106,7 +113,7 @@ std::vector<int> PointCloud::ClusterDBSCAN(double eps,
         cluster_label++;
     }
 
-    utility::LogDebug("Done Compute Clusters: {:d}", cluster_label);
+    utility::LogInfo("Done Compute Clusters: {:d}", cluster_label);
     return labels;
 }
 
