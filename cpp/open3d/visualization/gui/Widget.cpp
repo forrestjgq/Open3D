@@ -119,7 +119,9 @@ Widget::DrawResult Widget::Draw(const DrawContext& context) {
             auto r = child->Draw(context);
             // The mouse can only be over one item, so there should never
             // be multiple items returning non-NONE.
-            if (r != DrawResult::NONE) {
+            // But some items might notify parent redraw or relayout like
+            // list view updates content, so we prefer relayout, and then redraw.
+            if (r > result) {
                 result = r;
             }
         }
@@ -213,6 +215,10 @@ Widget::DrawResult Widget::Tick(const TickEvent& e) {
         }
     }
     return result;
+}
+
+bool Widget::IsShrinkable() {
+    return false;
 }
 
 }  // namespace gui

@@ -63,6 +63,9 @@ public:
     void SetOnValueChanged(
             std::function<void(const char*, bool)> on_value_changed);
 
+    void SetShrinkable(bool shrinkable) ;
+    void Layout(const LayoutContext& context) override;
+    bool IsShrinkable() override;
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

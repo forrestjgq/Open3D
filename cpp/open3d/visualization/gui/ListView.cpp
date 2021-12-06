@@ -46,6 +46,8 @@ static int g_next_list_box_id = 1;
 struct ListView::Impl {
     std::string imgui_id_;
     std::vector<std::string> items_;
+    bool shrinkable_ = false;
+    bool need_relayout_ = false;
     int selected_index_ = NO_SELECTION;
     std::function<void(const char *, bool)> on_value_changed_;
 };
@@ -59,6 +61,7 @@ ListView::~ListView() {}
 void ListView::SetItems(const std::vector<std::string> &items) {
     impl_->items_ = items;
     impl_->selected_index_ = NO_SELECTION;
+    impl_->need_relayout_ = true;
 }
 
 int ListView::GetSelectedIndex() const { return impl_->selected_index_; }
@@ -94,7 +97,13 @@ Size ListView::CalcPreferredSize(const LayoutContext &context,
         size.x = std::max(size.x, item_size.x);
         size.y += ImGui::GetFrameHeight();
     }
-    return Size(int(std::ceil(size.x + 2.0f * padding.x)), Widget::DIM_GROW);
+    auto height = size.y;
+    if (!impl_->shrinkable_) {
+        height = Widget::DIM_GROW;
+    } else if (height == 0) {
+        height = (float)CalcMinimumSize(context).height;
+    }
+    return Size(int(std::ceil(size.x + 2.0f * padding.x)), height);
 }
 
 Size ListView::CalcMinimumSize(const LayoutContext &context) const {
@@ -170,9 +179,23 @@ Widget::DrawResult ListView::Draw(const DrawContext &context) {
     ImGui::PopStyleColor(4);
 
     ImGui::PopItemWidth();
+    if (impl_->need_relayout_) {
+        impl_->need_relayout_ = false;
+        return Widget::DrawResult::RELAYOUT;
+    }
     return result;
 }
 
+void ListView::SetShrinkable(bool shrinkable) {
+    impl_->shrinkable_ = shrinkable;
+}
+bool ListView::IsShrinkable() {
+    return true;
+}
+
+void ListView::Layout(const LayoutContext& context) {
+    impl_->need_relayout_ = false;
+}
 }  // namespace gui
 }  // namespace visualization
 }  // namespace open3d

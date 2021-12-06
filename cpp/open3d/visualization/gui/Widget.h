@@ -136,10 +136,12 @@ public:
     /// Return DrawResult::REDRAW if you want to be redrawn.
     virtual DrawResult Tick(const TickEvent& e);
 
+    virtual bool IsShrinkable();
 protected:
     void DrawImGuiPushEnabledState();
     void DrawImGuiPopEnabledState();
     void DrawImGuiTooltip();
+
 
 private:
     struct Impl;

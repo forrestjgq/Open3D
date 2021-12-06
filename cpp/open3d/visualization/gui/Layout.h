@@ -202,6 +202,7 @@ public:
     virtual ~ScrollableVert();
 
     Widget::DrawResult Draw(const DrawContext& context) override;
+    bool IsShrinkable() override;
 
 private:
     struct Impl;

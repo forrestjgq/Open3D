@@ -965,7 +965,10 @@ void pybind_gui_classes(py::module &m) {
                  })
             .def("set_items", &ListView::SetItems,
                  "Sets the list to display the list of items provided")
-            .def_property("selected_index", &ListView::GetSelectedIndex,
+            .def("set_shrinkable", &ListView::SetShrinkable,
+                 "make list height shrinkable so that list use vertical space it requires"
+                 "if parent is large enough and shrink height if not")
+    .def_property("selected_index", &ListView::GetSelectedIndex,
                           &ListView::SetSelectedIndex,
                           "The index of the currently selected item")
             .def_property_readonly("selected_value",

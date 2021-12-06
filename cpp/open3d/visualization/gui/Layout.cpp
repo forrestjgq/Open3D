@@ -36,6 +36,7 @@
 #include "open3d/visualization/gui/Theme.h"
 #include "open3d/visualization/gui/Util.h"
 
+
 namespace open3d {
 namespace visualization {
 namespace gui {
@@ -50,8 +51,8 @@ std::vector<int> CalcMajor(const LayoutContext& context,
     std::vector<Size> preferred_sizes;
     preferred_sizes.reserve(children.size());
     for (auto& child : children) {
-        preferred_sizes.push_back(
-                child->CalcPreferredSize(context, constraints));
+        auto sz = child->CalcPreferredSize(context, constraints);
+        preferred_sizes.push_back(sz);
     }
 
     // Preferred size in the minor direction is the maximum preferred size,
@@ -289,6 +290,7 @@ void Layout1D::Layout(const LayoutContext& context) {
             num_grow += 1;
         }
     }
+    // grow-able widget should override stretch
     int frame_size;
     if (impl_->dir_ == VERT) {
         frame_size = frame.height - impl_->margins_.GetVert();
@@ -297,6 +299,7 @@ void Layout1D::Layout(const LayoutContext& context) {
     }
     int total_spacing = impl_->spacing_ * std::max(0, int(major.size()) - 1);
     auto total_extra = frame_size - total - total_spacing;
+
     if (num_stretch > 0 && frame_size > total) {
         auto stretch = total_extra / num_stretch;
         auto leftover_stretch = total_extra - stretch * num_stretch;
@@ -310,10 +313,10 @@ void Layout1D::Layout(const LayoutContext& context) {
             }
         }
     } else if (frame_size < total) {
-        int n_shrinkable = num_grow;
+        int n_shrinkable = 0;
         if (impl_->dir_ == VERT) {
             for (auto& child : children) {
-                if (std::dynamic_pointer_cast<ScrollableVert>(child)) {
+                if (child->IsShrinkable()) {
                     n_shrinkable++;
                 }
             }
@@ -324,9 +327,7 @@ void Layout1D::Layout(const LayoutContext& context) {
             auto leftover = total_excess - excess * num_stretch;
             for (size_t i = 0; i < major.size(); ++i) {
                 if (major[i] >= Widget::DIM_GROW ||
-                    (impl_->dir_ == VERT &&
-                     std::dynamic_pointer_cast<ScrollableVert>(children[i]) !=
-                             nullptr)) {
+                    (impl_->dir_ == VERT && children[i]->IsShrinkable())) {
                     major[i] -= excess;
                     if (leftover > 0) {
                         major[i] -= 1;
@@ -532,6 +533,9 @@ Widget::DrawResult ScrollableVert::Draw(const DrawContext& context) {
     return result;
 }
 
+bool ScrollableVert::IsShrinkable() {
+    return true;
+}
 // ----------------------------------------------------------------------------
 std::shared_ptr<Layout1D::Fixed> Horiz::MakeFixed(int size) {
     return std::make_shared<Layout1D::Fixed>(size, HORIZ);
