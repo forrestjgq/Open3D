@@ -59,6 +59,7 @@
 #include "open3d/visualization/gui/TreeView.h"
 #include "open3d/visualization/gui/VectorEdit.h"
 #include "open3d/visualization/gui/Widget.h"
+#include "open3d/visualization/gui/WidgetProxy.h"
 #include "open3d/visualization/gui/Window.h"
 #include "open3d/visualization/rendering/Open3DScene.h"
 #include "open3d/visualization/rendering/Renderer.h"
@@ -695,6 +696,25 @@ void pybind_gui_classes(py::module &m) {
                  "it requires some internal setup in order to function "
                  "properly");
 
+    // ---- WidgetProxy ----
+    py::class_<WidgetProxy, UnownedPointer<WidgetProxy>, Widget> widgetProxy(
+            m, "WidgetProxy", "WidgetProxy");
+    widgetProxy.def(py::init<>(),
+                 "Creates a widget proxy")
+            .def("__repr__",
+                 [](const WidgetProxy &c) {
+                     std::stringstream s;
+                     s << "Checkbox (" << c.GetFrame().x << ", "
+                       << c.GetFrame().y << "), " << c.GetFrame().width << " x "
+                       << c.GetFrame().height;
+                     return s.str();
+                 })
+            .def(
+                    "set_widget",
+                    [](WidgetProxy &w, UnownedPointer<Widget> proxy) {
+                        w.SetWidget(TakeOwnership<Widget>(proxy));
+                    },
+                    "Adds a proxy widget");
     // ---- Button ----
     py::class_<Button, UnownedPointer<Button>, Widget> button(m, "Button",
                                                               "Button");
