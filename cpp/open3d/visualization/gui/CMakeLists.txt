@@ -40,6 +40,7 @@ set(GUI_SOURCE_FILES
     VectorEdit.cpp
     Widget.cpp
     WidgetProxy.cpp
+    WidgetStack.cpp
     Window.cpp
 )
 

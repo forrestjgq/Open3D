@@ -34,6 +34,7 @@ namespace visualization {
 namespace gui {
 struct WidgetProxy::Impl {
     std::shared_ptr<Widget> widget_;
+    bool need_layout_ = false;
 };
 
 WidgetProxy::WidgetProxy() : impl_(new WidgetProxy::Impl()) {}
@@ -44,6 +45,10 @@ std::shared_ptr<Widget> WidgetProxy::GetActiveWidget() const {
 }
 void WidgetProxy::SetWidget(std::shared_ptr<Widget> widget) {
     impl_->widget_ = widget;
+    impl_->need_layout_ = true;
+}
+std::shared_ptr<Widget> WidgetProxy::GetWidget() {
+    return GetActiveWidget();
 }
 void WidgetProxy::AddChild(std::shared_ptr<Widget> child) {
     auto widget = GetActiveWidget();
@@ -105,7 +110,7 @@ bool WidgetProxy::IsVisible() const {
     if (widget) {
         return Widget::IsVisible() && widget->IsVisible();
     }
-    return Widget::IsVisible();
+    return false;
 }
 
 void WidgetProxy::SetVisible(bool vis) {
@@ -113,7 +118,6 @@ void WidgetProxy::SetVisible(bool vis) {
     if (widget) {
         widget->SetVisible(vis);
     }
-    Widget::SetVisible(vis);
 }
 
 bool WidgetProxy::IsEnabled() const {
@@ -121,7 +125,7 @@ bool WidgetProxy::IsEnabled() const {
     if (widget) {
         return Widget::IsEnabled() && widget->IsEnabled();
     }
-    return Widget::IsEnabled();
+    return false;
 }
 
 void WidgetProxy::SetEnabled(bool enabled) {
@@ -129,7 +133,6 @@ void WidgetProxy::SetEnabled(bool enabled) {
     if (widget) {
         widget->SetEnabled(enabled);
     }
-    Widget::SetEnabled(enabled);
 }
 
 void WidgetProxy::SetTooltip(const char* text) {
@@ -181,6 +184,10 @@ Widget::DrawResult WidgetProxy::Draw(const DrawContext& context) {
     auto widget = GetActiveWidget();
     if (widget) {
         result = widget->Draw(context);
+    }
+    if (impl_->need_layout_) {
+        impl_->need_layout_ = false;
+        result = DrawResult::RELAYOUT;
     }
     return result;
 }

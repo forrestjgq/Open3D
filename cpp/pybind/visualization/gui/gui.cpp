@@ -60,6 +60,7 @@
 #include "open3d/visualization/gui/VectorEdit.h"
 #include "open3d/visualization/gui/Widget.h"
 #include "open3d/visualization/gui/WidgetProxy.h"
+#include "open3d/visualization/gui/WidgetStack.h"
 #include "open3d/visualization/gui/Window.h"
 #include "open3d/visualization/rendering/Open3DScene.h"
 #include "open3d/visualization/rendering/Renderer.h"
@@ -704,7 +705,7 @@ void pybind_gui_classes(py::module &m) {
             .def("__repr__",
                  [](const WidgetProxy &c) {
                      std::stringstream s;
-                     s << "Checkbox (" << c.GetFrame().x << ", "
+                     s << "Proxy (" << c.GetFrame().x << ", "
                        << c.GetFrame().y << "), " << c.GetFrame().width << " x "
                        << c.GetFrame().height;
                      return s.str();
@@ -714,7 +715,27 @@ void pybind_gui_classes(py::module &m) {
                     [](WidgetProxy &w, UnownedPointer<Widget> proxy) {
                         w.SetWidget(TakeOwnership<Widget>(proxy));
                     },
-                    "Adds a proxy widget");
+                    "Adds a proxy widget")
+            .def( "get_widget", &WidgetProxy::GetWidget,
+                  "Get proxy widget");
+    // ---- WidgetStack ----
+    py::class_<WidgetStack, UnownedPointer<WidgetStack>, WidgetProxy> widgetStack(
+            m, "WidgetStack", "WidgetStack");
+    widgetStack.def(py::init<>(),
+                    "Creates a widget proxy")
+            .def("__repr__",
+                 [](const WidgetStack &c) {
+                   std::stringstream s;
+                   s << "Stack (" << c.GetFrame().x << ", "
+                     << c.GetFrame().y << "), " << c.GetFrame().width << " x "
+                     << c.GetFrame().height;
+                   return s.str();
+                 })
+            .def(
+                    "pop_widget", &WidgetStack::PopWidget,
+                    "pop the latest widget set to stack by set_widget")
+            .def( "set_on_top", &WidgetStack::SetOnTop,
+                  "Callback(widget) called while a widget becomes the top one of stack");
     // ---- Button ----
     py::class_<Button, UnownedPointer<Button>, Widget> button(m, "Button",
                                                               "Button");

@@ -26,11 +26,10 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
 
-#include "open3d/visualization/gui/Gui.h"
-#include "open3d/visualization/gui/Widget.h"
+#include "open3d/visualization/gui/WidgetProxy.h"
+#include <memory>
+#include <functional>
 
 namespace open3d {
 
@@ -43,43 +42,15 @@ class Renderer;
 namespace visualization {
 namespace gui {
 
-class WidgetProxy : public Widget{
+class WidgetStack : public WidgetProxy {
 
 public:
-    WidgetProxy();
-    ~WidgetProxy() override;
+    WidgetStack();
+    ~WidgetStack() override;
 
-    void AddChild(std::shared_ptr<Widget> child) override;
-    const std::vector<std::shared_ptr<Widget>> GetChildren() const override;
-
-    virtual void SetWidget(std::shared_ptr<Widget> widget);
-    virtual std::shared_ptr<Widget> GetWidget();
-
-    const Rect& GetFrame() const override;
-    void SetFrame(const Rect& f) override;
-
-    const Color& GetBackgroundColor() const override;
-    bool IsDefaultBackgroundColor() const override;
-    void SetBackgroundColor(const Color& color) override;
-
-    bool IsVisible() const override;
-    void SetVisible(bool vis) override;
-
-    bool IsEnabled() const override;
-    void SetEnabled(bool enabled) override;
-    void SetTooltip(const char* text) override;
-    const char* GetTooltip() const override;
-    Size CalcPreferredSize(const LayoutContext& context,
-                                   const Constraints& constraints) const override;
-    Size CalcMinimumSize(const LayoutContext& context) const override;
-    void Layout(const LayoutContext& context) override;
-    DrawResult Draw(const DrawContext& context) override;
-    EventResult Mouse(const MouseEvent& e) override;
-    EventResult Key(const KeyEvent& e) override;
-    DrawResult Tick(const TickEvent& e) override;
-
-protected:
-    virtual std::shared_ptr<Widget> GetActiveWidget() const;
+    void SetWidget(std::shared_ptr<Widget> widget) override;
+    std::shared_ptr<Widget> PopWidget();
+    void SetOnTop(std::function<void(std::shared_ptr<Widget>)> onTopCallback);
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
