@@ -39,6 +39,8 @@ set(GUI_SOURCE_FILES
     Util.cpp
     VectorEdit.cpp
     Widget.cpp
+    WidgetProxy.cpp
+    WidgetStack.cpp
     Window.cpp
 )
 
