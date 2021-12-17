@@ -1325,11 +1325,16 @@ void pybind_gui_classes(py::module &m) {
                     "add_tab",
                     [](TabControl &tabs, const char *name,
                        UnownedPointer<Widget> panel) {
-                        tabs.AddTab(name, TakeOwnership<Widget>(panel));
+                        auto tab = TakeOwnership<Widget>(panel);
+                        tabs.AddTab(name, tab);
+                        return tab;
                     },
                     "Adds a tab. The first parameter is the title of the tab, "
                     "and the second parameter is a widget--normally this is a "
                     "layout.")
+            .def_property("selected_tab_index", &TabControl::GetSelectedTabIndex,
+                          &TabControl::SetSelectedTabIndex,
+                          "Selects the index of the tabs to display")
             .def("set_on_selected_tab_changed",
                  &TabControl::SetOnSelectedTabChanged,
                  "Calls the provided callback function with the index of the "
