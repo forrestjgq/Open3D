@@ -757,6 +757,11 @@ void pybind_gui_classes(py::module &m) {
             .def_property(
                     "is_on", &Button::GetIsOn, &Button::SetOn,
                     "True if the button is toggleable and in the on state")
+            .def_property(
+                    "min_width", &Button::GetMinWidth, &Button::SetMinWidth,
+                    "Minimum width of button, -1 if never set, width >= 10000"
+                    "indicates as width as possible."
+                    )
             // It is not possible to overload properties. But we want users
             // to be able to say "o.padding = 1.4" or "o.padding = 1",
             // and float and int are different types. Fortunately, we want
@@ -1565,6 +1570,8 @@ void pybind_gui_classes(py::module &m) {
             // TODO: write the proper constructor
             //        .def(py::init([]() { return new Layout1D(Layout1D::VERT,
             //        0, Margins(), {}); }))
+            .def_property("spacing", &Layout1D::GetSpacing,
+                          &Layout1D::SetSpacing, "spacing between items")
             .def("add_fixed", &Layout1D::AddFixed,
                  "Adds a fixed amount of empty space to the layout")
             .def(
