@@ -450,6 +450,9 @@ const std::vector<std::shared_ptr<Widget>>& Window::GetChildren() const {
     return impl_->children_;
 }
 
+bool Window::CallKeyInterceptor(const KeyEvent &e) {
+    return false;
+}
 void* Window::MakeDrawContextCurrent() const {
     auto old_context = ImGui::GetCurrentContext();
     ImGui::SetCurrentContext(impl_->imgui_.context);
@@ -1190,8 +1193,12 @@ void Window::OnKeyEvent(const KeyEvent& e) {
 
     // If an ImGUI widget is not getting keystrokes, we can send them to
     // non-ImGUI widgets
-    if (ImGui::GetCurrentContext()->ActiveId == 0 && impl_->focus_widget_) {
-        impl_->focus_widget_->Key(e);
+    if (ImGui::GetCurrentContext()->ActiveId == 0) {
+        if (!CallKeyInterceptor(e)) {
+            if (impl_->focus_widget_) {
+                impl_->focus_widget_->Key(e);
+            }
+        }
     }
 
     RestoreDrawContext(old_context);
