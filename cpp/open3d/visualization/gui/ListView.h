@@ -51,6 +51,7 @@ public:
     /// Selects the indicated row of the list. Does not call onValueChanged.
     void SetSelectedIndex(int index);
 
+    void SetPreferredMaxHeight(int heifht);
     Size CalcPreferredSize(const LayoutContext& context,
                            const Constraints& constraints) const override;
 

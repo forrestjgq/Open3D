@@ -961,6 +961,8 @@ void pybind_gui_classes(py::module &m) {
                        << " x " << lv.GetFrame().height;
                      return s.str();
                  })
+            .def("set_preferred_height", &ListView::SetPreferredMaxHeight,
+                 "set preferred height")
             .def("set_items", &ListView::SetItems,
                  "Sets the list to display the list of items provided")
             .def_property("selected_index", &ListView::GetSelectedIndex,

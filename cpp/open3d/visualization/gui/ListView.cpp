@@ -48,6 +48,7 @@ struct ListView::Impl {
     std::vector<std::string> items_;
     int selected_index_ = NO_SELECTION;
     std::function<void(const char *, bool)> on_value_changed_;
+    int max_height_ = DIM_GROW;
 };
 
 ListView::ListView() : impl_(new ListView::Impl()) {
@@ -81,6 +82,9 @@ void ListView::SetOnValueChanged(
     impl_->on_value_changed_ = on_value_changed;
 }
 
+void ListView::SetPreferredMaxHeight(int height) {
+    impl_->max_height_ = height;
+}
 Size ListView::CalcPreferredSize(const LayoutContext &context,
                                  const Constraints &constraints) const {
     auto padding = ImGui::GetStyle().FramePadding;
@@ -94,7 +98,14 @@ Size ListView::CalcPreferredSize(const LayoutContext &context,
         size.x = std::max(size.x, item_size.x);
         size.y += ImGui::GetFrameHeight();
     }
-    return Size(int(std::ceil(size.x + 2.0f * padding.x)), Widget::DIM_GROW);
+    auto height = (int)std::ceil(size.y + 2.0f * padding.y);
+    if (impl_->max_height_ == DIM_GROW) {
+        height = impl_->max_height_;
+    } else {
+        height = std::min(height, impl_->max_height_);
+    }
+
+    return Size(int(std::ceil(size.x + 2.0f * padding.x)), height);
 }
 
 Size ListView::CalcMinimumSize(const LayoutContext &context) const {
