@@ -557,8 +557,9 @@ void VisualizerWithEditing::KeyPressCallback(
                         (const geometry::PointCloud &)*original_geometry_ptr_;
                 editing_geometry_renderer_ptr_->UpdateGeometry();
             } else {
-                Visualizer::KeyPressCallback(window, key, scancode, action,
-                                             mods);
+                Visualizer::ResetViewPoint(true);
+//                Visualizer::KeyPressCallback(window, key, scancode, action,
+//                                             mods);
             }
             break;
         case GLFW_KEY_D:
