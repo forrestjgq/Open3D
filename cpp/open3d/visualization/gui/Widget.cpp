@@ -32,6 +32,8 @@
 #include "open3d/visualization/gui/Color.h"
 #include "open3d/visualization/gui/Events.h"
 
+#include "open3d/utility/Console.h"
+
 namespace open3d {
 namespace visualization {
 namespace gui {
@@ -48,6 +50,7 @@ struct Widget::Impl {
     bool is_visible_ = true;
     bool is_enabled_ = true;
     bool pop_disabled_flags_at_end_of_draw_ = false;
+    std::string dead_;
 };
 
 Widget::Widget() : impl_(new Widget::Impl()) {}
@@ -57,7 +60,12 @@ Widget::Widget(const std::vector<std::shared_ptr<Widget>>& children)
     impl_->children_ = children;
 }
 
-Widget::~Widget() {}
+Widget::~Widget() {
+    if (!impl_->dead_.empty()) {
+        utility::LogInfo("addr {}: {}", long(this), impl_->dead_.c_str());
+    }
+
+}
 
 void Widget::AddChild(std::shared_ptr<Widget> child) {
     impl_->children_.push_back(child);
@@ -89,6 +97,7 @@ bool Widget::IsEnabled() const { return impl_->is_enabled_; }
 
 void Widget::SetEnabled(bool enabled) { impl_->is_enabled_ = enabled; }
 
+void Widget::SetDeadString(const char *text) { impl_->dead_ = text; }
 void Widget::SetTooltip(const char* text) { impl_->tooltip_ = text; }
 
 const char* Widget::GetTooltip() const { return impl_->tooltip_.c_str(); }

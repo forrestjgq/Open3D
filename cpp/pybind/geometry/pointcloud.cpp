@@ -98,9 +98,7 @@ void pybind_pointcloud(py::module &m) {
                  "the indexes from the point cloud.",
                  "sampling_ratio"_a)
             .def("crop",
-                 (std::shared_ptr<PointCloud>(PointCloud::*)(
-                         const AxisAlignedBoundingBox &) const) &
-                         PointCloud::Crop,
+                 (std::shared_ptr<PointCloud>(PointCloud::*)( const AxisAlignedBoundingBox &) const) &PointCloud::Crop,
                  "Function to crop input pointcloud into output pointcloud",
                  "bounding_box"_a)
             .def("crop",

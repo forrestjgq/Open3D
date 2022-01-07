@@ -690,7 +690,9 @@ void pybind_gui_classes(py::module &m) {
             .def(
                     "add_child",
                     [](Widget &w, UnownedPointer<Widget> child) {
-                        w.AddChild(TakeOwnership<Widget>(child));
+                        auto sp_child = TakeOwnership<Widget>(child);
+                        w.AddChild(sp_child);
+                        return sp_child;
                     },
                     "Adds a child widget")
             .def("get_children", &Widget::GetChildren,
@@ -707,6 +709,8 @@ void pybind_gui_classes(py::module &m) {
                           "Background color of the widget")
             .def_property("tooltip", &Widget::GetTooltip, &Widget::SetTooltip,
                           "Widget's tooltip that is displayed on mouseover")
+            .def("set_dead_str", &Widget::SetDeadString,
+                 "set dead string printing")
             .def("calc_preferred_size", &Widget::CalcPreferredSize,
                  "Returns the preferred size of the widget. This is intended "
                  "to be called only during layout, although it will also work "
@@ -729,8 +733,10 @@ void pybind_gui_classes(py::module &m) {
                  })
             .def(
                     "set_widget",
-                    [](WidgetProxy &w, UnownedPointer<Widget> proxy) {
-                        w.SetWidget(TakeOwnership<Widget>(proxy));
+                    [](WidgetProxy &w, UnownedPointer<Widget> proxy) -> std::shared_ptr<Widget> {
+                        auto sp_child = TakeOwnership<Widget>(proxy);
+                        w.SetWidget(sp_child);
+                        return sp_child;
                     },
                     "Adds a proxy widget")
             .def( "get_widget", &WidgetProxy::GetWidget,
