@@ -96,6 +96,7 @@ public:
     virtual bool IsEnabled() const;
     virtual void SetEnabled(bool enabled);
 
+    void SetDeadString(const char *text);
     virtual void SetTooltip(const char* text);
     virtual const char* GetTooltip() const;
 

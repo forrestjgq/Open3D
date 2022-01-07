@@ -25,6 +25,7 @@
 // ----------------------------------------------------------------------------
 
 #include "open3d/visualization/gui/Layout.h"
+#include "open3d/utility/Console.h"
 
 #include <imgui.h>
 
