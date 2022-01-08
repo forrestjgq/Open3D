@@ -641,6 +641,21 @@ void pybind_gui_classes(py::module &m) {
             .def_readwrite("width", &Size::width)
             .def_readwrite("height", &Size::height);
 
+    class WidgetContainer {
+    public:
+        WidgetContainer() = default;
+        WidgetContainer(std::shared_ptr<Widget> widget) {widget_ = widget; }
+        ~WidgetContainer() = default;
+        void Set(std::shared_ptr<Widget> widget) { widget_ = widget;}
+        void Clear() { widget_.reset(); }
+    private:
+        std::shared_ptr<Widget> widget_;
+    };
+
+    py::class_<WidgetContainer, std::shared_ptr<WidgetContainer>> container(m, "WidgetContainer", "Stores shared ptr of widget");
+    container.def(py::init<>())
+            .def("clear", &WidgetContainer::Clear, "Clear widget");
+
     // ---- Widget ----
     // The holder for Widget and all derived classes is UnownedPointer because
     // a Widget may own Filament resources, so we cannot have Python holding
@@ -692,7 +707,7 @@ void pybind_gui_classes(py::module &m) {
                     [](Widget &w, UnownedPointer<Widget> child) {
                         auto sp_child = TakeOwnership<Widget>(child);
                         w.AddChild(sp_child);
-                        return sp_child;
+                        return std::make_shared<WidgetContainer>(sp_child);
                     },
                     "Adds a child widget")
             .def("get_children", &Widget::GetChildren,
@@ -733,10 +748,10 @@ void pybind_gui_classes(py::module &m) {
                  })
             .def(
                     "set_widget",
-                    [](WidgetProxy &w, UnownedPointer<Widget> proxy) -> std::shared_ptr<Widget> {
+                    [](WidgetProxy &w, UnownedPointer<Widget> proxy) -> std::shared_ptr<WidgetContainer> {
                         auto sp_child = TakeOwnership<Widget>(proxy);
                         w.SetWidget(sp_child);
-                        return sp_child;
+                        return std::make_shared<WidgetContainer>(sp_child);
                     },
                     "Adds a proxy widget")
             .def( "get_widget", &WidgetProxy::GetWidget,
@@ -1355,7 +1370,7 @@ void pybind_gui_classes(py::module &m) {
                        UnownedPointer<Widget> panel) {
                         auto tab = TakeOwnership<Widget>(panel);
                         tabs.AddTab(name, tab);
-                        return tab;
+                        return std::make_shared<WidgetContainer>(tab);
                     },
                     "Adds a tab. The first parameter is the title of the tab, "
                     "and the second parameter is a widget--normally this is a "
