@@ -423,10 +423,30 @@ public:
                                     rendering::Camera* camera)
         : camera_controls_(std::make_unique<rendering::CameraInteractorLogic>(
                   camera, MIN_FAR_PLANE)),
-          scene_(scene) {
+          scene_(scene), camera_(camera) {
         SetInteractor(camera_controls_.get());
     }
 
+    void SpaceMouse(const SpaceMouseEvent& evt) override {
+        if (evt.type == SpaceMouseEvent::MOTION) {
+            auto e = evt;
+            utility::LogInfo("r({} {} {}) ({} {} {})",
+                             e.motion.rx, e.motion.ry, e.motion.rz,
+                             e.motion.x, e.motion.y, e.motion.z
+            );
+
+//            e.adjust(20);
+            e.adjust(10, 10, 20, 15, 20, 15);
+            interactor_->StartMouseDrag();
+            interactor_->Rotate(e.motion.ry, -e.motion.rx);
+            interactor_->StartMouseDrag();
+            interactor_->RotateZ(0, -e.motion.rz);
+            interactor_->StartMouseDrag();
+            interactor_->Pan(e.motion.x, -e.motion.z);
+            interactor_->Dolly(-e.motion.y, rendering::MatrixInteractorLogic::DragType::SPACE_MOUSE);
+            interactor_->EndMouseDrag();
+        }
+    }
     void Mouse(const MouseEvent& e) override {
         switch (e.type) {
             case MouseEvent::BUTTON_DOWN: {
@@ -469,6 +489,7 @@ public:
 private:
     std::unique_ptr<rendering::CameraInteractorLogic> camera_controls_;
     rendering::Open3DScene* scene_;
+    rendering::Camera* camera_;
 
     void ChangeCenterOfRotation(std::shared_ptr<geometry::Image> depth_img,
                                 int x,
@@ -706,6 +727,9 @@ public:
         }
     }
 
+    void SpaceMouse(const SpaceMouseEvent& e) {
+        current_->SpaceMouse(e);
+    }
     void Mouse(const MouseEvent& e) {
         if (current_ == rotate_.get() && sun_interactor_enabled_) {
             if (e.type == MouseEvent::Type::BUTTON_DOWN &&
@@ -1183,6 +1207,11 @@ Widget::DrawResult SceneWidget::Draw(const DrawContext& context) {
     return Widget::DrawResult::NONE;
 }
 
+Widget::EventResult SceneWidget::SpaceMouse(const SpaceMouseEvent& e) {
+    SetRenderQuality(Quality::FAST);
+    impl_->controls_->SpaceMouse(e);
+    return Widget::EventResult::CONSUMED;
+}
 Widget::EventResult SceneWidget::Mouse(const MouseEvent& e) {
     // Lower render quality while rotating, since we will be redrawing
     // frequently. This will give a snappier feel to mouse movements,

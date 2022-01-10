@@ -44,6 +44,7 @@ namespace gui {
 
 class Color;
 struct MouseEvent;
+struct SpaceMouseEvent;
 struct KeyEvent;
 struct TickEvent;
 struct Theme;
@@ -126,6 +127,7 @@ public:
     /// as Dear ImGUI will take care of all the mouse handling during
     /// the Draw().
     virtual EventResult Mouse(const MouseEvent& e);
+    virtual EventResult SpaceMouse(const SpaceMouseEvent& e);
 
     /// Widgets that use Dear ImGUI should not need to override this,
     /// as Dear ImGUI will take care of all the key handling during

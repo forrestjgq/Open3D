@@ -1048,6 +1048,12 @@ void Window::OnResize() {
     PostRedraw();
 }
 
+void Window::OnSpaceMouseEvent(const SpaceMouseEvent& e) {
+    if (impl_->focus_widget_ == nullptr) {
+        return;
+    }
+    impl_->focus_widget_->SpaceMouse(e);
+}
 void Window::OnMouseEvent(const MouseEvent& e) {
     MakeDrawContextCurrent();
 

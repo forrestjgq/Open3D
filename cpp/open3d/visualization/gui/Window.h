@@ -198,6 +198,7 @@ public:
     void OnDraw();
     void OnResize();
     void OnMouseEvent(const MouseEvent& e);
+    void OnSpaceMouseEvent(const SpaceMouseEvent& e);
     void OnKeyEvent(const KeyEvent& e);
     void OnTextInput(const TextInputEvent& e);
     void OnTickEvent(const TickEvent& e);

@@ -58,6 +58,7 @@
 #include "open3d/visualization/rendering/filament/FilamentEngine.h"
 #include "open3d/visualization/rendering/filament/FilamentRenderToBuffer.h"
 #include "open3d/visualization/utility/GLHelper.h"
+#include "open3d/visualization/gui/SpaceMouse.h"
 
 namespace {
 
@@ -142,6 +143,7 @@ struct Application::Impl {
     std::mutex posted_lock_;
     std::vector<Posted> posted_;
     // ----
+    SpaceMouse space_mouse_;
 
     void InitWindowSystem() {
         if (!window_system_) {
@@ -602,6 +604,13 @@ Application::RunStatus Application::ProcessQueuedEvents(EnvUnlocker &unlocker) {
             w->OnTickEvent(TickEvent());
         }
         impl_->last_time_ = now;
+    }
+
+    SpaceMouseEvent e;
+    if (impl_->space_mouse_.Poll(e)) {
+        for (auto& w : impl_->windows_) {
+            w->OnSpaceMouseEvent(e);
+        }
     }
 
     // Run any posted functions

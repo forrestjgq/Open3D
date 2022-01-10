@@ -75,6 +75,7 @@ public:
 
         virtual rendering::MatrixInteractorLogic& GetMatrixInteractor() = 0;
         virtual void Mouse(const MouseEvent& e) = 0;
+        virtual void SpaceMouse(const SpaceMouseEvent& e) {};
         virtual void Key(const KeyEvent& e) = 0;
         virtual bool Tick(const TickEvent& e) { return false; }
     };
@@ -190,6 +191,7 @@ public:
     Widget::DrawResult Draw(const DrawContext& context) override;
 
     Widget::EventResult Mouse(const MouseEvent& e) override;
+    Widget::EventResult SpaceMouse(const SpaceMouseEvent& e) override;
     Widget::EventResult Key(const KeyEvent& e) override;
     Widget::DrawResult Tick(const TickEvent& e) override;
 

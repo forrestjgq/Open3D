@@ -210,6 +210,10 @@ Widget::EventResult Widget::Mouse(const MouseEvent& e) {
     return EventResult::DISCARD;
 }
 
+Widget::EventResult Widget::SpaceMouse(const SpaceMouseEvent& e) {
+    return EventResult::DISCARD;
+}
+
 Widget::EventResult Widget::Key(const KeyEvent& e) {
     return EventResult::DISCARD;
 }
