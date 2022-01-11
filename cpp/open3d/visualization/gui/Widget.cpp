@@ -33,6 +33,7 @@
 #include "open3d/visualization/gui/Events.h"
 
 #include "open3d/utility/Console.h"
+#include "open3d/visualization/utility/SpaceMouse.h"
 
 namespace open3d {
 namespace visualization {
@@ -207,6 +208,10 @@ Widget::EventResult Widget::Mouse(const MouseEvent& e) {
     // do it later), or this is an empty widget like a panel or something,
     // which eats events (it doesn't handle the event [e.g. button down]
     // and nor should anything else).
+    return EventResult::DISCARD;
+}
+
+Widget::EventResult Widget::SpaceMouse(const open3d::visualization::SpaceMouseEvent& e) {
     return EventResult::DISCARD;
 }
 

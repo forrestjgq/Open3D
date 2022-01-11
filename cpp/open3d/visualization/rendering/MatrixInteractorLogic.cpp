@@ -25,6 +25,7 @@
 // ----------------------------------------------------------------------------
 
 #include "open3d/visualization/rendering/MatrixInteractorLogic.h"
+#include "open3d/utility/Console.h"
 
 namespace open3d {
 namespace visualization {
@@ -98,7 +99,13 @@ void MatrixInteractorLogic::Rotate(int dx, int dy) {
     axis = matrix.rotation() * axis;  // convert axis to world coords
     rot_matrix = rot_matrix * Eigen::AngleAxisf(-theta, axis);
 
+//    utility::LogInfo("dim {}, beofre", matrix.Dim);
+//    utility::LogInfo("[ {} {} {} ]", matrix(0,0), matrix(0,1), matrix(0,2));
+//    utility::LogInfo("[ {} {} {} ]", matrix(1,0), matrix(1,1), matrix(1,2));
+//    utility::LogInfo("[ {} {} {} ]", matrix(2,0), matrix(2,1), matrix(2,2));
+
     auto pos = matrix * Eigen::Vector3f(0, 0, 0);
+//    utility::LogInfo("after [ {} {} {} ]", pos(0,0), pos(1,0), pos(2,0));
     Eigen::Vector3f to_cor = center_of_rotation_ - pos;
     auto dist = to_cor.norm();
     // If the center of rotation is behind the camera we need to flip
@@ -150,7 +157,64 @@ float MatrixInteractorLogic::CalcRotateRadians(int dx, int dy) {
     Eigen::Vector3f moved(float(dx), float(dy), 0);
     return 0.5f * float(M_PI) * moved.norm() / (0.5f * float(view_height_));
 }
+float MatrixInteractorLogic::CalcRotateRadians3D(int dx, int dy, int dz) {
+    Eigen::Vector3f moved((float)dx, (float)dy, (float)dz);
+    return 0.5f * float(M_PI) * moved.norm() / (0.5f * float(view_height_));
+}
 
+void MatrixInteractorLogic::Rotate3D(int dx, int dy, int dz) {
+    auto matrix = matrix_at_mouse_down_;  // copy
+    Eigen::AngleAxisf rot_matrix(0, Eigen::Vector3f(1, 0, 0));
+
+    // We want to rotate as if we were rotating an imaginary trackball
+    // centered at the point of rotation. To do this we need an axis
+    // of rotation and an angle about the axis. To find the axis, we
+    // imagine that the viewing plane has been translated into the screen
+    // so that it intersects the center of rotation. The axis we want
+    // to rotate around is perpendicular to the vector defined by (dx, dy)
+    // (assuming +x is right and +y is up). (Imagine the situation if the
+    // mouse movement is (100, 0) or (0, 100).) Now it is easy to find
+    // the perpendicular in 2D. Conveniently, (axis.x, axis.y, 0) is the
+    // correct axis in camera-local coordinates. We can multiply by the
+    // camera's rotation matrix to get the correct world vector.
+    dy = -dy;  // up is negative, but the calculations are easiest to
+                                                     // imagine up is positive.
+    Eigen::Vector3f axis(float(-dy), float(dx), float(dz));  // rotate by 90 deg in 2D
+    axis = axis.normalized();
+
+    float theta = CalcRotateRadians3D(dx, dy, dz);
+
+    axis = matrix.rotation() * axis;  // convert axis to world coords
+    rot_matrix = rot_matrix * Eigen::AngleAxisf(-theta, axis);
+
+    //    utility::LogInfo("dim {}, beofre", matrix.Dim);
+    //    utility::LogInfo("[ {} {} {} ]", matrix(0,0), matrix(0,1), matrix(0,2));
+    //    utility::LogInfo("[ {} {} {} ]", matrix(1,0), matrix(1,1), matrix(1,2));
+    //    utility::LogInfo("[ {} {} {} ]", matrix(2,0), matrix(2,1), matrix(2,2));
+
+    auto pos = matrix * Eigen::Vector3f(0, 0, 0);
+    //    utility::LogInfo("after [ {} {} {} ]", pos(0,0), pos(1,0), pos(2,0));
+    Eigen::Vector3f to_cor = center_of_rotation_ - pos;
+    auto dist = to_cor.norm();
+    // If the center of rotation is behind the camera we need to flip
+    // the sign of 'dist'. We can just dotprod with the forward vector
+    // of the camera. Forward is [0, 0, -1] for an identity matrix,
+    // so forward is simply rotation * [0, 0, -1].
+    Eigen::Vector3f forward =
+            matrix.rotation() * Eigen::Vector3f{0.0f, 0.0f, -1.0f};
+    if (to_cor.dot(forward) < 0) {
+        dist = -dist;
+    }
+    Camera::Transform m;
+    m.fromPositionOrientationScale(center_of_rotation_,
+                                   rot_matrix * matrix.rotation(),
+                                   Eigen::Vector3f(1, 1, 1));
+    m.translate(Eigen::Vector3f(0, 0, dist));
+
+    matrix_ = m;
+}
+void MatrixInteractorLogic::Translate3D(int dx, int dy, int dz) {
+}
 void MatrixInteractorLogic::RotateZ(int dx, int dy) {
     // RotateZ rotates around the axis normal to the screen. Since we
     // will be rotating using camera coordinates, we want to rotate
@@ -228,6 +292,9 @@ float MatrixInteractorLogic::CalcDollyDist(float dy,
             break;
         case DragType::WHEEL:  // actual mouse wheel, same as two-fingers
             dist = float(-dy) * 0.05f * float(length);
+            break;
+        case DragType::SPACE_MOUSE:  // actual mouse wheel, same as two-fingers
+            dist = float(-dy) * 0.008f * float(length);
             break;
     }
     return dist;

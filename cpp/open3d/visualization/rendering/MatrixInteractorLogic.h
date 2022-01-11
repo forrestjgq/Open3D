@@ -54,6 +54,8 @@ public:
 
     const Camera::Transform& GetMatrix() const;
 
+    void Rotate3D(int dx, int dy, int dz);
+    void Translate3D(int dx, int dy, int dz);
     /// Rotates about an axis defined by dx * matrixLeft, dy * matrixUp.
     /// `dy` is assumed to be in window-style coordinates, that is, going
     /// up produces a negative dy. The axis goes through the center of
@@ -72,7 +74,7 @@ public:
 
     virtual void RotateZWorld(int dx, int dy, const Eigen::Vector3f& forward);
 
-    enum class DragType { MOUSE, WHEEL, TWO_FINGER };
+    enum class DragType { MOUSE, WHEEL, TWO_FINGER, SPACE_MOUSE };
 
     /// Moves the matrix along the forward axis. (This is one type
     /// of zoom.)
@@ -94,6 +96,8 @@ protected:
 
     void SetMatrix(const Camera::Transform& matrix);
     float CalcRotateRadians(int dx, int dy);
+    float CalcRotateRadians3D(int dx, int dy, int dz);
+
     float CalcRotateZRadians(int dx, int dy);
     float CalcDollyDist(float dy,
                         DragType drag_type,

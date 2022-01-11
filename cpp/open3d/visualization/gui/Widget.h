@@ -37,6 +37,7 @@ namespace visualization {
 namespace rendering {
 class Renderer;
 }
+struct SpaceMouseEvent;
 }  // namespace visualization
 
 namespace visualization {
@@ -47,6 +48,7 @@ struct MouseEvent;
 struct KeyEvent;
 struct TickEvent;
 struct Theme;
+
 
 struct LayoutContext {
     const Theme& theme;
@@ -126,6 +128,7 @@ public:
     /// as Dear ImGUI will take care of all the mouse handling during
     /// the Draw().
     virtual EventResult Mouse(const MouseEvent& e);
+    virtual EventResult SpaceMouse(const SpaceMouseEvent& e);
 
     /// Widgets that use Dear ImGUI should not need to override this,
     /// as Dear ImGUI will take care of all the key handling during

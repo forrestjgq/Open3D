@@ -25,6 +25,7 @@
 // ----------------------------------------------------------------------------
 
 #include "open3d/visualization/visualizer/Visualizer.h"
+#include "open3d/visualization/utility/SpaceMouse.h"
 
 #include "open3d/geometry/TriangleMesh.h"
 
@@ -286,17 +287,27 @@ void Visualizer::Close() {
     glfwSetWindowShouldClose(window_, GL_TRUE);
     utility::LogDebug("[Visualizer] Window closing.");
 }
-
+void Visualizer::PollSpaceMouseEvents() {
+    SpaceMouseEvent evt{};
+    if (SpaceMouse::GetInstance()->Poll(evt)) {
+        if (glfwGetWindowAttrib(window_, GLFW_FOCUSED) == GLFW_TRUE) {
+            OnSpaceMouseEvent(evt);
+        }
+    }
+}
 bool Visualizer::WaitEvents() {
     if (!is_initialized_) {
         return false;
     }
+
+    PollSpaceMouseEvents();
+
     glfwMakeContextCurrent(window_);
     if (is_redraw_required_) {
         WindowRefreshCallback(window_);
     }
     animation_callback_func_in_loop_ = animation_callback_func_;
-    glfwWaitEvents();
+    glfwWaitEventsTimeout(0.025);
     return !glfwWindowShouldClose(window_);
 }
 
@@ -304,6 +315,7 @@ bool Visualizer::PollEvents() {
     if (!is_initialized_) {
         return false;
     }
+    PollSpaceMouseEvents();
     glfwMakeContextCurrent(window_);
     if (is_redraw_required_) {
         WindowRefreshCallback(window_);

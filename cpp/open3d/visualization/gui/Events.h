@@ -108,6 +108,7 @@ struct MouseEvent {
     std::string ToString() const;
 };
 
+
 struct TickEvent {
     double dt;
 };

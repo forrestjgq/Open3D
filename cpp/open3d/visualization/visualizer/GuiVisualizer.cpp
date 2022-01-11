@@ -994,12 +994,12 @@ void GuiVisualizer::LoadGeometry(const std::string &path) {
             if (success) {
                 utility::LogInfo("Successfully read {}", path.c_str());
                 UpdateProgress(ioProgressAmount);
-                if (!cloud->HasNormals()) {
-                    cloud->EstimateNormals();
-                }
-                UpdateProgress(0.666f);
-                cloud->NormalizeNormals();
-                UpdateProgress(0.75f);
+//                if (!cloud->HasNormals()) {
+//                    cloud->EstimateNormals();
+//                }
+//                UpdateProgress(0.666f);
+//                cloud->NormalizeNormals();
+//                UpdateProgress(0.75f);
                 geometry = cloud;
             } else {
                 utility::LogWarning("Failed to read points {}", path.c_str());
