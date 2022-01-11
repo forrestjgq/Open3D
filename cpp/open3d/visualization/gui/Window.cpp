@@ -244,6 +244,7 @@ struct Window::Impl {
     Widget* mouse_grabber_widget_ = nullptr;  // only if not ImGUI widget
     Widget* focus_widget_ =
             nullptr;  // only used if ImGUI isn't taking keystrokes
+    bool is_focusing_ = false;
     bool wants_auto_size_ = false;
     bool wants_auto_center_ = false;
     bool needs_layout_ = true;
@@ -1048,11 +1049,14 @@ void Window::OnResize() {
     PostRedraw();
 }
 
-void Window::OnSpaceMouseEvent(const SpaceMouseEvent& e) {
-    if (impl_->focus_widget_ == nullptr) {
+void Window::OnSpaceMouseEvent(const open3d::visualization::SpaceMouseEvent& e) {
+    if (impl_->focus_widget_ == nullptr || !impl_->is_focusing_) {
         return;
     }
     impl_->focus_widget_->SpaceMouse(e);
+}
+void Window::OnFocus(bool focused) {
+    impl_->is_focusing_ = focused;
 }
 void Window::OnMouseEvent(const MouseEvent& e) {
     MakeDrawContextCurrent();

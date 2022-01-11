@@ -108,41 +108,6 @@ struct MouseEvent {
     std::string ToString() const;
 };
 
-struct SpaceMouseEvent {
-    enum Type {MOTION, BUTTON};
-    Type type;
-    union {
-        struct {
-            int x, y, z;
-            int rx, ry, rz;
-            unsigned int period;
-        } motion;
-        struct {
-            bool press;
-            int btn_num;
-        } button;
-    };
-    void adjust(int coeff) {
-        if (type == MOTION and coeff > 0) {
-            motion.rx /= coeff;
-            motion.ry /= coeff;
-            motion.rz /= coeff;
-            motion.x /= coeff;
-            motion.y /= coeff;
-            motion.z /= coeff;
-        }
-    }
-    void adjust(int rx, int ry, int rz, int x, int y, int z) {
-        if (type == MOTION) {
-            if (rx > 0) motion.rx /= rx;
-            if (ry > 0) motion.ry /= ry;
-            if (rz > 0) motion.rz /= rz;
-            if (x > 0) motion.x /= x;
-            if (y > 0) motion.y /= y;
-            if (z > 0) motion.z /= z;
-        }
-    }
-};
 
 struct TickEvent {
     double dt;

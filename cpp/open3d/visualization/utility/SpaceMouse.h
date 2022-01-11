@@ -26,24 +26,74 @@
 
 #pragma once
 
-#include "open3d/visualization/gui/Events.h"
 #include <memory>
+#include <map>
+#include <functional>
+#include <thread>
+#include <mutex>
 
 
 namespace open3d {
 namespace visualization {
-namespace gui {
+
+struct SpaceMouseEvent {
+    enum Type {MOTION, BUTTON};
+    Type type;
+    union {
+        struct {
+            int x, y, z;
+            int rx, ry, rz;
+            unsigned int period;
+        } motion;
+        struct {
+            bool press;
+            int btn_num;
+        } button;
+    };
+    void adjust(int coeff) {
+        if (type == MOTION and coeff > 0) {
+            motion.rx /= coeff;
+            motion.ry /= coeff;
+            motion.rz /= coeff;
+            motion.x /= coeff;
+            motion.y /= coeff;
+            motion.z /= coeff;
+        }
+    }
+    void adjust(int rx, int ry, int rz, int x, int y, int z) {
+        if (type == MOTION) {
+            if (rx > 0) motion.rx /= rx;
+            if (ry > 0) motion.ry /= ry;
+            if (rz > 0) motion.rz /= rz;
+            if (x > 0) motion.x /= x;
+            if (y > 0) motion.y /= y;
+            if (z > 0) motion.z /= z;
+        }
+    }
+};
 
 class SpaceMouse {
 public:
-    SpaceMouse();
+    using Callback = std::function<void(const SpaceMouseEvent &)>;
+    static SpaceMouse* GetInstance();
+    static void Exit();
     ~SpaceMouse();
     bool Poll(SpaceMouseEvent &e);
+    void Wait();
+    void Stop();
+
+private:
+    void Recv(void *);
+    SpaceMouse();
 
 private:
     bool ready_ = false;
+    std::shared_ptr<std::thread> thread_;
+    SpaceMouseEvent evt_;
+    bool has_evt_ = false;
+    std::mutex mt_;
+    static std::shared_ptr<SpaceMouse> me_;
 };
 
-}  // namespace gui
 }  // namespace visualization
 }  // namespace open3d

@@ -25,6 +25,8 @@
 // ----------------------------------------------------------------------------
 
 #include "open3d/visualization/visualizer/Visualizer.h"
+#include "open3d/visualization/utility/SpaceMouse.h"
+
 
 namespace open3d {
 namespace visualization {
@@ -115,6 +117,45 @@ void Visualizer::MouseButtonCallback(GLFWwindow *window,
         mouse_control_.is_shift_key_down = false;
         mouse_control_.is_alt_key_down = false;
         mouse_control_.is_super_key_down = false;
+    }
+}
+
+void Visualizer::OnSpaceMouseEvent(const SpaceMouseEvent &evt) {
+    if (evt.type == SpaceMouseEvent::BUTTON) {
+        if (evt.button.press) {
+            if(evt.button.btn_num == 0) {
+                ResetViewPoint(true);
+            } else if(evt.button.btn_num == 1) {
+                ResetViewPoint(false);
+            }
+        }
+        return;
+    }
+    auto e = evt;
+    e.adjust(4, 4, 4, 4, 1, 4);
+//    utility::LogInfo("space mouse evt: r({} {} {}) ({} {} {})",
+//                     e.motion.rx, e.motion.ry, e.motion.rz,
+//                     e.motion.x, e.motion.y, e.motion.z);
+    bool flag = false;
+    if (e.motion.ry != 0 || e.motion.rx != 0) {
+        view_control_ptr_->Rotate(e.motion.ry, -e.motion.rx);
+        flag = true;
+    }
+    if (e.motion.rz != 0) {
+        view_control_ptr_->Roll(-e.motion.rz);
+        flag = true;
+    }
+    if (e.motion.x != 0 || e.motion.z != 0) {
+        view_control_ptr_->Translate(e.motion.x, -e.motion.z);
+        flag = true;
+    }
+    if (e.motion.y != 0) {
+        auto y = float(-e.motion.y) / 75.0f;
+        view_control_ptr_->Scale(y);
+        flag = true;
+    }
+    if (flag) {
+        UpdateRender();
     }
 }
 

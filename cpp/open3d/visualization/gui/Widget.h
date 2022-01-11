@@ -37,6 +37,7 @@ namespace visualization {
 namespace rendering {
 class Renderer;
 }
+struct SpaceMouseEvent;
 }  // namespace visualization
 
 namespace visualization {
@@ -44,10 +45,10 @@ namespace gui {
 
 class Color;
 struct MouseEvent;
-struct SpaceMouseEvent;
 struct KeyEvent;
 struct TickEvent;
 struct Theme;
+
 
 struct LayoutContext {
     const Theme& theme;

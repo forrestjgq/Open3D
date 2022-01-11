@@ -42,7 +42,6 @@ set(GUI_SOURCE_FILES
     WidgetProxy.cpp
     WidgetStack.cpp
     Window.cpp
-    SpaceMouse.cpp
 )
 
 if (WIN32)

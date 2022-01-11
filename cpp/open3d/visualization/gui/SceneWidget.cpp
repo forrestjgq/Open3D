@@ -51,6 +51,7 @@
 #include "open3d/visualization/rendering/Open3DScene.h"
 #include "open3d/visualization/rendering/Scene.h"
 #include "open3d/visualization/rendering/View.h"
+#include "open3d/visualization/utility/SpaceMouse.h"
 
 namespace open3d {
 namespace visualization {
@@ -427,23 +428,32 @@ public:
         SetInteractor(camera_controls_.get());
     }
 
-    void SpaceMouse(const SpaceMouseEvent& evt) override {
-        if (evt.type == SpaceMouseEvent::MOTION) {
+    void SpaceMouse(const ::open3d::visualization::SpaceMouseEvent& evt) override {
+        if (evt.type == ::open3d::visualization::SpaceMouseEvent::MOTION) {
             auto e = evt;
-            utility::LogInfo("r({} {} {}) ({} {} {})",
-                             e.motion.rx, e.motion.ry, e.motion.rz,
-                             e.motion.x, e.motion.y, e.motion.z
-            );
+//            utility::LogInfo("r({} {} {}) ({} {} {})",
+//                             e.motion.rx, e.motion.ry, e.motion.rz,
+//                             e.motion.x, e.motion.y, e.motion.z
+//            );
 
-//            e.adjust(20);
-            e.adjust(10, 10, 20, 15, 20, 15);
-            interactor_->StartMouseDrag();
-            interactor_->Rotate(e.motion.ry, -e.motion.rx);
-            interactor_->StartMouseDrag();
-            interactor_->RotateZ(0, -e.motion.rz);
-            interactor_->StartMouseDrag();
-            interactor_->Pan(e.motion.x, -e.motion.z);
-            interactor_->Dolly(-e.motion.y, rendering::MatrixInteractorLogic::DragType::SPACE_MOUSE);
+            e.adjust(5, 5, 10, 10, 1, 10);
+            if (e.motion.ry != 0 || e.motion.rx != 0) {
+                interactor_->StartMouseDrag();
+                interactor_->Rotate(e.motion.ry, -e.motion.rx);
+            }
+            if (e.motion.rz != 0) {
+                interactor_->StartMouseDrag();
+                interactor_->RotateZ(0, -e.motion.rz);
+            }
+            if (e.motion.x != 0 || e.motion.z != 0) {
+                interactor_->StartMouseDrag();
+                interactor_->Pan(e.motion.x, -e.motion.z);
+            }
+            if (e.motion.y != 0) {
+                auto y = (float)(-e.motion.y)/15.0f;
+                interactor_->Dolly(y, rendering::MatrixInteractorLogic::
+                                           DragType::SPACE_MOUSE);
+            }
             interactor_->EndMouseDrag();
         }
     }
@@ -727,7 +737,7 @@ public:
         }
     }
 
-    void SpaceMouse(const SpaceMouseEvent& e) {
+    void SpaceMouse(const ::open3d::visualization::SpaceMouseEvent& e) {
         current_->SpaceMouse(e);
     }
     void Mouse(const MouseEvent& e) {

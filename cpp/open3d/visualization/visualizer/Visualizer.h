@@ -56,6 +56,7 @@ class Image;
 
 namespace visualization {
 
+struct SpaceMouseEvent;
 /// \class Visualizer
 ///
 /// \brief The main Visualizer class.
@@ -132,6 +133,7 @@ public:
     /// function will NOT block the thread. Thus it is suitable for computation
     /// heavy task behind the scene.
     bool PollEvents();
+    void PollSpaceMouseEvents();
 
     /// \brief Function to add geometry to the scene and create corresponding
     /// shaders.
@@ -265,6 +267,7 @@ protected:
             GLFWwindow *window, int key, int scancode, int action, int mods);
     /// \brief Function to notify the window to be closed.
     virtual void WindowCloseCallback(GLFWwindow *window);
+    virtual void OnSpaceMouseEvent(const SpaceMouseEvent &evt);
     virtual void OnExit();
 
 protected:

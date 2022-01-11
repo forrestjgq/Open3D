@@ -24,46 +24,85 @@
 // IN THE SOFTWARE.
 // ----------------------------------------------------------------------------
 
-#include "open3d/visualization/gui/SpaceMouse.h"
+#include "open3d/visualization/utility/SpaceMouse.h"
+#include "open3d/utility/Console.h"
 
 #include <spnav.h>
 
 namespace open3d {
 namespace visualization {
-namespace gui {
 
-SpaceMouse::SpaceMouse() {
+std::shared_ptr<SpaceMouse> SpaceMouse::me_;
+
+void SpaceMouse::Exit() {
+    if(me_) {
+        me_->Stop();
+    }
+}
+SpaceMouse* SpaceMouse::GetInstance() {
+    if (!me_) {
+        me_ = std::shared_ptr<SpaceMouse>(new SpaceMouse());
+    }
+    return me_.get();
+}
+SpaceMouse::SpaceMouse() : evt_{} {
     if (spnav_open() < 0) {
         return;
     }
+    thread_ = std::make_shared<std::thread>([this]() { this->Wait();});
     ready_ = true;
+    atexit(SpaceMouse::Exit);
 }
 SpaceMouse::~SpaceMouse() {
+    Stop();
+}
+void SpaceMouse::Recv(void *data) {
+    auto evt = (spnav_event *)data;
+    auto &e = evt_;
+    std::unique_lock<std::mutex> locker(mt_);
+    if (evt->type == SPNAV_EVENT_MOTION) {
+        e.type = SpaceMouseEvent::MOTION;
+        e.motion.rx = evt->motion.rx;
+        e.motion.ry = evt->motion.ry;
+        e.motion.rz = evt->motion.rz;
+        e.motion.x = evt->motion.x;
+        e.motion.y = evt->motion.y;
+        e.motion.z = evt->motion.z;
+        e.motion.period = evt->motion.period;
+    } else {
+        e.type = SpaceMouseEvent::BUTTON;
+        e.button.btn_num = evt->button.bnum;
+        e.button.press = (evt->button.press != 0);
+    }
+    has_evt_ = true;
+}
+void SpaceMouse::Stop() {
     if (ready_) {
+        ready_ = false;
         spnav_close();
+        thread_->join();
+        thread_.reset();
+    }
+}
+void SpaceMouse::Wait() {
+    spnav_event evt;
+    while(ready_) {
+        auto typ = spnav_poll_event(&evt);
+        if (typ != 0) {
+            Recv(&evt);
+            spnav_remove_events(typ);
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(15));
     }
 }
 bool SpaceMouse::Poll(SpaceMouseEvent &e) {
-    spnav_event evt;
-    if (spnav_poll_event(&evt) == 0) {
-        return false;
+    if (ready_ && has_evt_) {
+        std::unique_lock<std::mutex> locker(mt_);
+        has_evt_ = false;
+        e = evt_;
+        return true;
     }
-    if (evt.type == SPNAV_EVENT_MOTION) {
-        e.type = SpaceMouseEvent::MOTION;
-        e.motion.rx = evt.motion.rx;
-        e.motion.ry = evt.motion.ry;
-        e.motion.rz = evt.motion.rz;
-        e.motion.x = evt.motion.x;
-        e.motion.y = evt.motion.y;
-        e.motion.z = evt.motion.z;
-        e.motion.period = evt.motion.period;
-    } else {
-        e.type = SpaceMouseEvent::BUTTON;
-        e.button.btn_num = evt.button.bnum;
-        e.button.press = (evt.button.press != 0);
-    }
-    return true;
+    return false;
 }
-}  // namespace gui
 }  // namespace visualization
 }  // namespace open3d
