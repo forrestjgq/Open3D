@@ -210,10 +210,11 @@ Widget::EventResult Widget::Mouse(const MouseEvent& e) {
     // and nor should anything else).
     return EventResult::DISCARD;
 }
-
+#ifdef USE_SPNAV
 Widget::EventResult Widget::SpaceMouse(const open3d::visualization::SpaceMouseEvent& e) {
     return EventResult::DISCARD;
 }
+#endif
 
 Widget::EventResult Widget::Key(const KeyEvent& e) {
     return EventResult::DISCARD;

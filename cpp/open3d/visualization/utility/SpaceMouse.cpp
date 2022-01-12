@@ -24,10 +24,12 @@
 // IN THE SOFTWARE.
 // ----------------------------------------------------------------------------
 
+#ifdef USE_SPNAV
 #include "open3d/visualization/utility/SpaceMouse.h"
 #include "open3d/utility/Console.h"
 
 #include <spnav.h>
+
 
 namespace open3d {
 namespace visualization {
@@ -106,3 +108,4 @@ bool SpaceMouse::Poll(SpaceMouseEvent &e) {
 }
 }  // namespace visualization
 }  // namespace open3d
+#endif

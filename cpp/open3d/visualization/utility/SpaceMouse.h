@@ -26,6 +26,7 @@
 
 #pragma once
 
+#ifdef USE_SPNAV
 #include <memory>
 #include <map>
 #include <functional>
@@ -97,3 +98,4 @@ private:
 
 }  // namespace visualization
 }  // namespace open3d
+#endif

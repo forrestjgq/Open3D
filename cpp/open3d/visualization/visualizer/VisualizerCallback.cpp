@@ -120,6 +120,7 @@ void Visualizer::MouseButtonCallback(GLFWwindow *window,
     }
 }
 
+#ifdef USE_SPNAV
 void Visualizer::OnSpaceMouseEvent(const SpaceMouseEvent &evt) {
     if (evt.type == SpaceMouseEvent::BUTTON) {
         if (evt.button.press) {
@@ -158,6 +159,7 @@ void Visualizer::OnSpaceMouseEvent(const SpaceMouseEvent &evt) {
         UpdateRender();
     }
 }
+#endif
 
 void Visualizer::KeyPressCallback(
         GLFWwindow *window, int key, int scancode, int action, int mods) {

@@ -199,7 +199,9 @@ public:
     void OnDraw();
     void OnResize();
     void OnMouseEvent(const MouseEvent& e);
+#ifdef USE_SPNAV
     void OnSpaceMouseEvent(const open3d::visualization::SpaceMouseEvent& e);
+#endif
     void OnKeyEvent(const KeyEvent& e);
     void OnTextInput(const TextInputEvent& e);
     void OnTickEvent(const TickEvent& e);
