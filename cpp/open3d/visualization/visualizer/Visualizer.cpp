@@ -288,12 +288,14 @@ void Visualizer::Close() {
     utility::LogDebug("[Visualizer] Window closing.");
 }
 void Visualizer::PollSpaceMouseEvents() {
+#if USE_SPNAV
     SpaceMouseEvent evt{};
     if (SpaceMouse::GetInstance()->Poll(evt)) {
         if (glfwGetWindowAttrib(window_, GLFW_FOCUSED) == GLFW_TRUE) {
             OnSpaceMouseEvent(evt);
         }
     }
+#endif
 }
 bool Visualizer::WaitEvents() {
     if (!is_initialized_) {

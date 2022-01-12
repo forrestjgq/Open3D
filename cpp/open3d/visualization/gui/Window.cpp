@@ -1049,12 +1049,14 @@ void Window::OnResize() {
     PostRedraw();
 }
 
+#ifdef USE_SPNAV
 void Window::OnSpaceMouseEvent(const open3d::visualization::SpaceMouseEvent& e) {
     if (impl_->focus_widget_ == nullptr || !impl_->is_focusing_) {
         return;
     }
     impl_->focus_widget_->SpaceMouse(e);
 }
+#endif
 void Window::OnFocus(bool focused) {
     impl_->is_focusing_ = focused;
 }

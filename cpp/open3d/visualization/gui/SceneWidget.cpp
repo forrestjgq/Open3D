@@ -427,7 +427,7 @@ public:
           scene_(scene), camera_(camera) {
         SetInteractor(camera_controls_.get());
     }
-
+#ifdef USE_SPNAV
     void SpaceMouse(const ::open3d::visualization::SpaceMouseEvent& evt) override {
         if (evt.type == ::open3d::visualization::SpaceMouseEvent::MOTION) {
             auto e = evt;
@@ -457,6 +457,7 @@ public:
             interactor_->EndMouseDrag();
         }
     }
+#endif
     void Mouse(const MouseEvent& e) override {
         switch (e.type) {
             case MouseEvent::BUTTON_DOWN: {
@@ -736,10 +737,11 @@ public:
                 break;
         }
     }
-
+#ifdef USE_SPNAV
     void SpaceMouse(const ::open3d::visualization::SpaceMouseEvent& e) {
         current_->SpaceMouse(e);
     }
+#endif
     void Mouse(const MouseEvent& e) {
         if (current_ == rotate_.get() && sun_interactor_enabled_) {
             if (e.type == MouseEvent::Type::BUTTON_DOWN &&
@@ -1217,11 +1219,13 @@ Widget::DrawResult SceneWidget::Draw(const DrawContext& context) {
     return Widget::DrawResult::NONE;
 }
 
+#ifdef USE_SPNAV
 Widget::EventResult SceneWidget::SpaceMouse(const SpaceMouseEvent& e) {
     SetRenderQuality(Quality::FAST);
     impl_->controls_->SpaceMouse(e);
     return Widget::EventResult::CONSUMED;
 }
+#endif
 Widget::EventResult SceneWidget::Mouse(const MouseEvent& e) {
     // Lower render quality while rotating, since we will be redrawing
     // frequently. This will give a snappier feel to mouse movements,

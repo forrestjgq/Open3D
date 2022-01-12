@@ -1243,3 +1243,20 @@ else()
     # Don't incude WebRTC headers in Open3D.h.
     set(BUILD_WEBRTC_COMMENT "//")
 endif()
+
+find_package(spnav)
+if(spnav_FOUND)
+    add_library(3rdparty_spnav INTERFACE)
+    target_include_directories(3rdparty_spnav INTERFACE ${SPNAV_INCLUDE_DIR})
+    target_link_libraries(3rdparty_spnav INTERFACE ${SPNAV_LIBRARY})
+    if(NOT BUILD_SHARED_LIBS)
+        install(TARGETS 3rdparty_spnav EXPORT ${PROJECT_NAME}Targets
+                RUNTIME DESTINATION ${Open3D_INSTALL_BIN_DIR}
+                ARCHIVE DESTINATION ${Open3D_INSTALL_LIB_DIR}
+                LIBRARY DESTINATION ${Open3D_INSTALL_LIB_DIR}
+                )
+    endif()
+    set(SPNAV_TARGET 3rdparty_spnav)
+    list(APPEND Open3D_3RDPARTY_PRIVATE_TARGETS ${SPNAV_TARGET})
+    add_definitions(-DUSE_SPNAV)
+endif()
