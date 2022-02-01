@@ -120,6 +120,8 @@ Open3DScene::Open3DScene(Renderer& renderer) : renderer_(renderer) {
     scene_ = renderer_.CreateScene();
     auto scene = renderer_.GetScene(scene_);
     view_ = scene->AddView(0, 0, 1, 1);
+    snap_view_ = scene->AddView(0, 0, 1, 1);
+    utility::LogInfo("view {} snap {}", view_.GetId(), snap_view_.GetId());
     SetBackground({1.0f, 1.0f, 1.0f, 1.0f});
 
     SetLighting(LightingProfile::MED_SHADOWS, {0.577f, -0.577f, -0.577f});
@@ -131,12 +133,17 @@ Open3DScene::~Open3DScene() {
     ClearGeometry();
     auto scene = renderer_.GetScene(scene_);
     scene->RemoveGeometry(kAxisObjectName);
+    scene->RemoveView(snap_view_);
     scene->RemoveView(view_);
 }
 
 View* Open3DScene::GetView() const {
     auto scene = renderer_.GetScene(scene_);
     return scene->GetView(view_);
+}
+View* Open3DScene::GetSnapView() const {
+    auto scene = renderer_.GetScene(scene_);
+    return scene->GetView(snap_view_);
 }
 
 void Open3DScene::SetViewport(std::int32_t x,
@@ -151,6 +158,14 @@ void Open3DScene::SetViewport(std::int32_t x,
     // with respect to the window, and we are setting the viewport with respect
     // to the render target here.
     view->SetViewport(0, 0, width, height);
+    view->EnableViewCaching(true);
+
+    view = GetSnapView();
+    // Since we are rendering into a texture (EnableViewCaching(true) below),
+    // we need to use the entire texture; the viewport passed in is the viewport
+    // with respect to the window, and we are setting the viewport with respect
+    // to the render target here.
+    view->SetViewport(0, 0, width/2, height/2);
     view->EnableViewCaching(true);
 }
 
@@ -486,6 +501,11 @@ Open3DScene::LOD Open3DScene::GetLOD() const { return lod_; }
 
 Scene* Open3DScene::GetScene() const { return renderer_.GetScene(scene_); }
 
+Camera* Open3DScene::GetSnapCamera() const {
+    auto scene = renderer_.GetScene(scene_);
+    auto view = scene->GetView(snap_view_);
+    return view->GetCamera();
+}
 Camera* Open3DScene::GetCamera() const {
     auto scene = renderer_.GetScene(scene_);
     auto view = scene->GetView(view_);

@@ -213,6 +213,7 @@ public:
 
 private:
     visualization::rendering::Camera* GetCamera() const;
+    visualization::rendering::Camera* GetSnapCamera() const;
 
 private:
     struct Impl;

@@ -1923,6 +1923,7 @@ void FilamentScene::Draw(filament::Renderer& renderer) {
             continue;
         }
 
+
         container.view->PreRender();
         renderer.render(container.view->GetNativeView());
         container.view->PostRender();

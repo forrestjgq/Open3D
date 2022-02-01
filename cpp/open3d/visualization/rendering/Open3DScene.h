@@ -60,7 +60,9 @@ public:
     ~Open3DScene();
 
     View* GetView() const;
+    View* GetSnapView() const;
     ViewHandle GetViewId() const { return view_; }
+    ViewHandle GetSnapViewId() const { return snap_view_; }
     void SetViewport(std::int32_t x,
                      std::int32_t y,
                      std::uint32_t width,
@@ -135,6 +137,7 @@ public:
 
     Scene* GetScene() const;
     Camera* GetCamera() const;
+    Camera* GetSnapCamera() const;
     Renderer& GetRenderer() const;
 
 private:
@@ -155,6 +158,7 @@ private:
     Renderer& renderer_;
     SceneHandle scene_;
     ViewHandle view_;
+    ViewHandle snap_view_;
 
     Eigen::Vector4f background_color;
     LOD lod_ = LOD::HIGH_DETAIL;

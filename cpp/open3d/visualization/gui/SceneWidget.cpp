@@ -1368,6 +1368,10 @@ void SceneWidget::SetupCamera(
     rendering::Camera::SetupCameraAsPinholeCamera(
             *camera, intrinsic, extrinsic, intrinsic_width_px,
             intrinsic_height_px, scene_bounds);
+    camera = GetSnapCamera();
+    rendering::Camera::SetupCameraAsPinholeCamera(
+            *camera, intrinsic, extrinsic, intrinsic_width_px,
+            intrinsic_height_px, scene_bounds);
 
     // We need to calculate the center of rotation (rather than specifying it
     // because the intrinsic/extrinsic matrices define a position for the camera
@@ -1384,6 +1388,7 @@ void SceneWidget::LookAt(const Eigen::Vector3f& center,
                          const Eigen::Vector3f& eye,
                          const Eigen::Vector3f& up) {
     GetCamera()->LookAt(center, eye, up);
+    GetSnapCamera()->LookAt(center, eye, up);
     impl_->controls_->SetCenterOfRotation(center);
     impl_->UpdateFarPlane(GetFrame(), GetCamera()->GetFieldOfView());
 }
@@ -1518,6 +1523,8 @@ void SceneWidget::EnableSceneCaching(bool enable) {
     if (!enable) {
         impl_->scene_->GetScene()->SetViewActive(impl_->scene_->GetViewId(),
                                                  true);
+        impl_->scene_->GetScene()->SetViewActive(impl_->scene_->GetSnapViewId(),
+                                                 true);
     }
 }
 
@@ -1526,6 +1533,7 @@ void SceneWidget::ForceRedraw() {
     if (!impl_->scene_caching_enabled_) return;
 
     impl_->scene_->GetScene()->SetRenderOnce(impl_->scene_->GetViewId());
+    impl_->scene_->GetScene()->SetRenderOnce(impl_->scene_->GetSnapViewId());
     impl_->controls_->SetPickNeedsRedraw();
 }
 
@@ -1538,12 +1546,16 @@ void SceneWidget::SetRenderQuality(Quality quality) {
             if (impl_->scene_caching_enabled_) {
                 impl_->scene_->GetScene()->SetViewActive(
                         impl_->scene_->GetViewId(), true);
+                impl_->scene_->GetScene()->SetViewActive(
+                        impl_->scene_->GetSnapViewId(), true);
             }
         } else {
             impl_->scene_->SetLOD(rendering::Open3DScene::LOD::HIGH_DETAIL);
             if (impl_->scene_caching_enabled_) {
                 impl_->scene_->GetScene()->SetRenderOnce(
                         impl_->scene_->GetViewId());
+                impl_->scene_->GetScene()->SetRenderOnce(
+                        impl_->scene_->GetSnapViewId());
             }
         }
     }
@@ -1581,10 +1593,14 @@ void SceneWidget::GoToCameraPreset(CameraPreset preset) {
         }
     }
     GetCamera()->LookAt(center, eye, up);
+    impl_->scene_->GetSnapCamera()->LookAt(center, eye, up);
     impl_->controls_->SetCenterOfRotation(center);
     ForceRedraw();
 }
 
+rendering::Camera* SceneWidget::GetSnapCamera() const {
+    return impl_->scene_->GetSnapCamera();
+}
 rendering::Camera* SceneWidget::GetCamera() const {
     return impl_->scene_->GetCamera();
 }
@@ -1634,6 +1650,10 @@ Widget::DrawResult SceneWidget::Draw(const DrawContext& context) {
             camera->SetProjection(camera->GetFieldOfView(), aspect,
                                   camera->GetNear(), camera->GetFar(),
                                   camera->GetFieldOfViewType());
+            camera = impl_->scene_->GetSnapCamera();
+            camera->SetProjection(camera->GetFieldOfView(), aspect,
+                                  camera->GetNear(), camera->GetFar(),
+                                  camera->GetFieldOfViewType());
         }
 
         impl_->controls_->SetPickNeedsRedraw();
@@ -1653,6 +1673,11 @@ Widget::DrawResult SceneWidget::Draw(const DrawContext& context) {
     auto render_tex = impl_->scene_->GetView()->GetColorBuffer();
     ImTextureID image_id = reinterpret_cast<ImTextureID>(render_tex.GetId());
     ImGui::Image(image_id, ImVec2(f.width, f.height), ImVec2(0.0f, 1.0f),
+                 ImVec2(1.0f, 0.0f));
+    ImGui::SetCursorPos(ImVec2(float(f.x+f.width/2), float(f.y+f.height/2)));
+    auto render_tex1 = impl_->scene_->GetSnapView()->GetColorBuffer();
+    ImTextureID image_id_1 = reinterpret_cast<ImTextureID>(render_tex1.GetId());
+    ImGui::Image(image_id_1, ImVec2(f.width/2, f.height/2), ImVec2(0.0f, 1.0f),
                  ImVec2(1.0f, 0.0f));
 
     if (!impl_->labels_3d_.empty()) {
