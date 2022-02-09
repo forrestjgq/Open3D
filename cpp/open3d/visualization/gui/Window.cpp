@@ -217,8 +217,8 @@ struct Window::Impl {
     bool draw_menu_ = true;
     std::unordered_map<Menu::ItemId, std::function<void()>> menu_callbacks_;
     std::function<bool(void)> on_tick_event_;
-    std::function<bool(const KeyEvent&)> on_key_event_;
     std::function<bool(void)> on_close_;
+    std::function<bool(const KeyEvent&)> on_key_event_;
     // We need these for mouse moves and wheel events.
     // The only source of ground truth is button events, so the rest of
     // the time we monitor key up/down events.
@@ -635,6 +635,7 @@ void Window::SetOnClose(std::function<bool()> callback) {
 void Window::SetOnKeyEvent(std::function<bool(const KeyEvent&)> callback) {
     impl_->on_key_event_ = callback;
 }
+
 void Window::ShowDialog(std::shared_ptr<Dialog> dlg) {
     if (impl_->active_dialog_) {
         CloseDialog();
