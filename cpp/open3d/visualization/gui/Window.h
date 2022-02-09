@@ -201,7 +201,6 @@ protected:
     LayoutContext GetLayoutContext();
 
     const std::vector<std::shared_ptr<Widget>>& GetChildren() const;
-    virtual bool CallKeyInterceptor(const KeyEvent &e);
 public:
     // these are intended for internal delivery of events
     void OnDraw();
