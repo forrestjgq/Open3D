@@ -938,14 +938,16 @@ public:
         return Widget::EventResult::DISCARD;
     }
     Widget::DrawResult Draw(const DrawContext& context, const Rect &frame) {
-        auto col_fill = colorToImguiRGBA(Color(0.5f, 0.0f, 0.5f, 0.5f));
-        auto col_line = colorToImguiRGBA(Color(1.0f, 0.0f, 0.0f, 1.0f));
+        static auto col_start = colorToImguiRGBA(Color(0.5f, 0.0f, 0.5f, 1.0f));
+        static auto col_end = colorToImguiRGBA(Color(1.0f, 0.3f, 0.8f, 1.0f));
+        static auto col_fill = colorToImguiRGBA(Color(0.5f, 0.0f, 0.5f, 0.5f));
+        static auto col_line = colorToImguiRGBA(Color(1.0f, 0.0f, 0.0f, 1.0f));
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
         switch (type_) {
             case SelectionType::None:
                 break;
             case SelectionType::Rectangle:
                 if (selection_.size() == 2) {
-                    ImDrawList* draw_list = ImGui::GetWindowDrawList();
                     auto p0 = PointAt(0, frame.x, frame.y);
                     auto p1 = PointAt(1, frame.x, frame.y);
                     draw_list->AddRectFilled({p0.x(), p0.y()},
@@ -953,21 +955,30 @@ public:
                                              col_fill);
                 }
                 break;
-            case SelectionType::Polygon:
+            case SelectionType::Polygon: {
                 if (selection_.size() >= 2) {
-                    ImDrawList* draw_list = ImGui::GetWindowDrawList();
                     for (auto i = 0; i < (int)selection_.size(); i++) {
                         auto p0 = PointAt(i, frame.x, frame.y);
                         auto p1 = PointAt((i+1)%(int(selection_.size())), frame.x, frame.y);
                         draw_list->AddLine({float(p0.x()), float(p0.y())},
                                            {float(p1.x()), float(p1.y())},
                                            col_line, 2);
+
+                        auto p = PointAt(selection_.size()-1, frame.x, frame.y);
+                        draw_list->AddCircleFilled({p.x(), p.y()},
+                                                   10, col_end, 10);
                     }
                 }
+                if (!selection_.empty()) {
+                    auto p = PointAt(0, frame.x, frame.y);
+                    draw_list->AddCircleFilled({p.x(), p.y()},
+                                               10, col_start, 10);
+                }
                 break;
+
+            }
             case SelectionType::Circle:
                 if (selection_.size() == 2) {
-                    ImDrawList* draw_list = ImGui::GetWindowDrawList();
                     auto p0 = PointAt(0, frame.x, frame.y);
                     auto p1 = PointAt(1, frame.x, frame.y);
                     auto radius = (p0-p1).norm();
@@ -983,23 +994,77 @@ public:
 private:
     template <class T>
     class Seg {
+        class Point {
+        public:
+            Point(int x_, int y_) {
+                x = x_;
+                y = y_;
+            }
+            T x, y;
+        };
     public:
         Seg(const Eigen::Vector2<T> &p0, const Eigen::Vector2<T> &p1)
             : p0_(p0), p1_(p1){
         }
         const Eigen::Vector2<T> &p0_, &p1_;
         bool cross(const Seg &other) const {
-            auto v0 = other.p0_ - p0_;
-            auto v1 = other.p1_ - p1_;
-            auto vm = p1_ - p0_;
-            return mul(v0, vm) * mul(v1, vm) <= 0;
+            Point p1(p0_.x(), p0_.y());
+            Point p2(p1_.x(), p1_.y());
+            Point q1(other.p0_.x(), other.p0_.y());
+            Point q2(other.p1_.x(), other.p1_.y());
+            return doIntersect(p1, p2, q1, q2);
         }
-        T mul(const Eigen::Vector2<T> &v0, const Eigen::Vector2<T> &v1) const {
-            return v0.x()*v1.y() - v1.x() * v0.y();
+
+    private:
+        // Given three collinear points p, q, r, the function checks if
+        // point q lies on line segment 'pr'
+        bool onSegment(const Point& p, const Point& q, const Point& r) const {
+            if (q.x <= std::max(p.x, r.x) && q.x >= std::min(p.x, r.x) &&
+                q.y <= std::max(p.y, r.y) && q.y >= std::min(p.y, r.y))
+                return true;
+
+            return false;
         }
-        static bool cross(const Seg &s0, const Seg &s1) {
-            return s0.cross(s1) && s1.cross(s0);
+
+        // To find orientation of ordered triplet (p, q, r).
+        // The function returns following values
+        // 0 --> p, q and r are collinear
+        // 1 --> Clockwise
+        // 2 --> Counterclockwise
+        int orientation(const Point& p, const Point& q, const Point& r) const {
+            // See https://www.geeksforgeeks.org/orientation-3-ordered-points/
+            // for details of below formula.
+            int val = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
+            if (val == 0) return 0; // collinear
+            return (val > 0)? 1: 2; // clock or counterclock wise
         }
+
+        // The main function that returns true if line segment 'p1q1'
+        // and 'p2q2' intersect.
+        bool doIntersect(const Point& p1, const Point& q1,
+                         const Point& p2, const Point& q2) const {
+            // Find the four orientations needed for general and
+            // special cases
+            int o1 = orientation(p1, q1, p2);
+            int o2 = orientation(p1, q1, q2);
+            int o3 = orientation(p2, q2, p1);
+            int o4 = orientation(p2, q2, q1);
+
+            // General case
+            if (o1 != o2 && o3 != o4) return true;
+
+            // Special Cases
+            // p1, q1 and p2 are collinear and p2 lies on segment p1q1
+            if (o1 == 0 && onSegment(p1, p2, q1)) return true;
+            // p1, q1 and q2 are collinear and q2 lies on segment p1q1
+            if (o2 == 0 && onSegment(p1, q2, q1)) return true;
+            // p2, q2 and p1 are collinear and p1 lies on segment p2q2
+            if (o3 == 0 && onSegment(p2, p1, q2)) return true;
+            // p2, q2 and q1 are collinear and q1 lies on segment p2q2
+            if (o4 == 0 && onSegment(p2, q1, q2)) return true;
+            return false; // Doesn't fall in any of the above cases
+        }
+
     };
     void AddPoint(int x, int y) {
         if (type_ == SelectionType::None) {
@@ -1020,23 +1085,26 @@ private:
                 case SelectionType::Polygon: {
                     Eigen::Vector2i p(x, y);
                     auto segs = selection_.size() - 1;
+                    auto discard = false;
                     if (segs > 2) {
-                        // check if latest segment is crossing any previous one
+                        // seg by last point and new
                         Seg<int> s0(selection_[selection_.size()-1], p);
-                        bool cross = false;
-                        for (size_t idx = selection_.size()-2; idx > 0; --idx) {
-                            Seg<int> s1(selection_[idx], selection_[idx-1]);
-                            if (Seg<int>::cross(s0, s1)) {
-                                cross = true;
-                                break;
-                            }
-                        }
-                        if (cross) {
-                            // abandon cross polygon point
-                            break;
+                        // seg by first point and new
+                        Seg<int> s1(selection_[0], p);
+
+                        for (size_t idx = 0;
+                             !discard && idx < selection_.size()-1;
+                             ++idx) {
+                            Seg<int> s(selection_[idx], selection_[idx+1]);
+                            bool last = idx == selection_.size() - 2;
+                            bool first = idx == 0;
+                            discard = (!last && s0.cross(s)) ||
+                                      (!first && s1.cross(s));
                         }
                     }
-                    selection_.push_back(p);
+                    if (!discard) {
+                        selection_.push_back(p);
+                    }
                     break;
                 }
                 default:
