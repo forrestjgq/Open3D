@@ -25,6 +25,7 @@ target_sources(GUI PRIVATE
     Menu.cpp
     MenuImgui.cpp
     NumberEdit.cpp
+    RadioButton.cpp
     PickPointsInteractor.cpp
     ProgressBar.cpp
     SceneWidget.cpp
