@@ -29,6 +29,7 @@ target_sources(GUI PRIVATE
     PickPointsInteractor.cpp
     ProgressBar.cpp
     SceneWidget.cpp
+    GeometryEditor.cpp
     Slider.cpp
     StackedWidget.cpp
     TabControl.cpp

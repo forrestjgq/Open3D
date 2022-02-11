@@ -1419,8 +1419,6 @@ void pybind_gui_classes(py::module &m) {
                  "Start editing")
             .def("stop_edit", &PySceneWidget::StopEdit,
                  "Stop editing")
-            .def("crop_selected", &PySceneWidget::CropSelected,
-                 "Crop selected and return selected + left point cloud")
             .def("collect_selected_indices", &PySceneWidget::CollectSelectedIndices,
                  "collect selected indices")
             .def("pick_point", &PySceneWidget::StartPickPoint,
