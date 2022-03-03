@@ -200,23 +200,18 @@ void pybind_gui_classes(py::module &m) {
     // ---- FontDescription ----
     py::class_<FontDescription> fd(m, "FontDescription",
                                    "Class to describe a custom font");
-    fd.def_readonly_static("SANS_SERIF", &FontDescription::SANS_SERIF,
-                           "Name of the default sans-serif font that comes "
-                           "with Open3D")
-            .def_readonly_static(
-                    "MONOSPACE", &FontDescription::MONOSPACE,
-                    "Name of the default monospace font that comes "
-                    "with Open3D")
-            .def(py::init<const char *, FontStyle, int>(),
-                 "typeface"_a = FontDescription::SANS_SERIF,
-                 "style"_a = FontStyle::NORMAL, "point_size"_a = 0,
-                 "Creates a FontDescription. 'typeface' is a path to a "
-                 "TrueType (.ttf), TrueType Collection (.ttc), or "
-                 "OpenType (.otf) file, or it is the name of the font, "
-                 "in which case the system font paths will be searched "
-                 "to find the font file. This typeface will be used for "
-                 "roman characters (Extended Latin, that is, European "
-                 "languages")
+    fd.attr("SANS_SERIF") = FontDescription::SANS_SERIF;
+    fd.attr("MONOSPACE") = FontDescription::MONOSPACE;
+    fd.def(py::init<const char *, FontStyle, int>(),
+           "typeface"_a = FontDescription::SANS_SERIF,
+           "style"_a = FontStyle::NORMAL, "point_size"_a = 0,
+           "Creates a FontDescription. 'typeface' is a path to a "
+           "TrueType (.ttf), TrueType Collection (.ttc), or "
+           "OpenType (.otf) file, or it is the name of the font, "
+           "in which case the system font paths will be searched "
+           "to find the font file. This typeface will be used for "
+           "roman characters (Extended Latin, that is, European "
+           "languages")
             .def("add_typeface_for_language",
                  &FontDescription::AddTypefaceForLanguage,
                  "Adds code points outside Extended Latin from the specified "
@@ -247,9 +242,8 @@ void pybind_gui_classes(py::module &m) {
                                         "Global application singleton. This "
                                         "owns the menubar, windows, and event "
                                         "loop");
+    application.attr("DEFAULT_FONT_ID") = Application::DEFAULT_FONT_ID;
     application
-            .def_readonly_static("DEFAULT_FONT_ID",
-                                 &Application::DEFAULT_FONT_ID)
             .def("__repr__",
                  [](const Application &app) {
                      return std::string("Application singleton instance");
@@ -1836,7 +1830,7 @@ void pybind_gui_classes(py::module &m) {
                     return new Horiz(spacing, margins);
                 }),
                 "spacing"_a = 0, "margins"_a = Margins(),
-                "Creates a layout that arranges widgets vertically, left to "
+                "Creates a layout that arranges widgets horizontally, left to "
                 "right, making their height equal to the layout's height "
                 "(which will generally be the largest height of the items). "
                 "First argument is the spacing between widgets, the second "
@@ -1845,7 +1839,7 @@ void pybind_gui_classes(py::module &m) {
                      return new Horiz(int(std::round(spacing)), margins);
                  }),
                  "spacing"_a = 0.0f, "margins"_a = Margins(),
-                 "Creates a layout that arranges widgets vertically, left to "
+                 "Creates a layout that arranges widgets horizontally, left to "
                  "right, making their height equal to the layout's height "
                  "(which will generally be the largest height of the items). "
                  "First argument is the spacing between widgets, the second "
