@@ -46,6 +46,7 @@
 #include "open3d/visualization/gui/GeometryEditor.h"
 #include "open3d/visualization/rendering/Camera.h"
 #include "open3d/visualization/rendering/CameraInteractorLogic.h"
+#include "open3d/visualization/rendering/EditModelInteractorLogic.h"
 #include "open3d/visualization/rendering/CameraSphereInteractorLogic.h"
 #include "open3d/visualization/rendering/IBLRotationInteractorLogic.h"
 #include "open3d/visualization/rendering/LightDirectionInteractorLogic.h"
@@ -312,11 +313,11 @@ public:
         return *interactor_;
     }
 
-    Eigen::Vector3f GetCenterOfRotation() const {
+    virtual Eigen::Vector3f GetCenterOfRotation() const {
         return interactor_->GetCenterOfRotation();
     }
 
-    void SetCenterOfRotation(const Eigen::Vector3f& center) {
+    virtual void SetCenterOfRotation(const Eigen::Vector3f& center) {
         interactor_->SetCenterOfRotation(center);
     }
 
@@ -427,9 +428,31 @@ public:
                                     rendering::Camera* camera)
         : camera_controls_(std::make_unique<rendering::CameraInteractorLogic>(
                   camera, MIN_FAR_PLANE)),
-          scene_(scene), camera_(camera) {
+         model_controls_(std::make_unique<rendering::EditModelInteractorLogic>(
+                scene, camera, MIN_FAR_PLANE)),
+    scene_(scene), camera_(camera) {
         SetInteractor(camera_controls_.get());
         (void) camera_->GetViewMatrix(); // disable compiling warning
+    }
+    void SetModel(const std::string &model,
+                  const geometry::AxisAlignedBoundingBox& scene_bounds,
+                  const Eigen::Vector3f &center) {
+        model_controls_->SetModel(model, scene_bounds, center);
+        if (!HasModel()) {
+            model_require_mouse_ = false;
+        }
+    }
+    rendering::MatrixInteractorLogic& GetMatrixInteractor() override {
+        return *camera_controls_;
+    }
+    rendering::MatrixInteractorLogic& GetModelMatrixInteractor() {
+        return *model_controls_;
+    }
+    Eigen::Vector3f GetCenterOfRotation() const override {
+        return camera_controls_->GetCenterOfRotation();
+    }
+    void SetCenterOfRotation(const Eigen::Vector3f& center) override {
+        camera_controls_->SetCenterOfRotation(center);
     }
 #ifdef USE_SPNAV
     void SpaceMouse(const ::open3d::visualization::SpaceMouseEvent& evt) override {
@@ -442,27 +465,40 @@ public:
 
             e.adjust(5, 5, 10, 10, 1, 10);
             if (e.motion.ry != 0 || e.motion.rx != 0) {
-                interactor_->StartMouseDrag();
-                interactor_->Rotate(e.motion.ry, -e.motion.rx);
+                camera_controls_->StartMouseDrag();
+                camera_controls_->Rotate(e.motion.ry, -e.motion.rx);
             }
             if (e.motion.rz != 0) {
-                interactor_->StartMouseDrag();
-                interactor_->RotateZ(0, -e.motion.rz);
+                camera_controls_->StartMouseDrag();
+                camera_controls_->RotateZ(0, -e.motion.rz);
             }
             if (e.motion.x != 0 || e.motion.z != 0) {
-                interactor_->StartMouseDrag();
-                interactor_->Pan(e.motion.x, -e.motion.z);
+                camera_controls_->StartMouseDrag();
+                camera_controls_->Pan(e.motion.x, -e.motion.z);
             }
             if (e.motion.y != 0) {
                 auto y = (float)(-e.motion.y)/15.0f;
-                interactor_->Dolly(y, rendering::MatrixInteractorLogic::
+                camera_controls_->Dolly(y, rendering::MatrixInteractorLogic::
                                            DragType::SPACE_MOUSE);
             }
-            interactor_->EndMouseDrag();
+            camera_controls_->EndMouseDrag();
         }
     }
 #endif
     void Mouse(const MouseEvent& e) override {
+        if (e.type == MouseEvent::BUTTON_DOWN || e.type == MouseEvent::WHEEL) {
+            model_require_mouse_ = HasModel();
+            if (model_require_mouse_) {
+                SetInteractor(model_controls_.get());
+                Super::Mouse(e);
+                return;
+             }
+            SetInteractor(camera_controls_.get());
+        } else if(model_require_mouse_) {
+            Super::Mouse(e);
+            return;
+        }
+
         switch (e.type) {
             case MouseEvent::BUTTON_DOWN: {
                 if (e.button.count == 2 &&
@@ -503,8 +539,14 @@ public:
 
 private:
     std::unique_ptr<rendering::CameraInteractorLogic> camera_controls_;
+    std::unique_ptr<rendering::EditModelInteractorLogic> model_controls_;
     rendering::Open3DScene* scene_;
     rendering::Camera* camera_;
+    bool model_require_mouse_ = false;
+
+    bool HasModel() {
+        return bool(model_controls_) && model_controls_->HasModel();
+    }
 
     void ChangeCenterOfRotation(std::shared_ptr<geometry::Image> depth_img,
                                 int x,
@@ -625,6 +667,8 @@ public:
 
     void SetViewSize(const Size& size) {
         rotate_->GetMatrixInteractor().SetViewSize(size.width, size.height);
+        rotate_->GetModelMatrixInteractor().SetViewSize(size.width, size.height);
+        rotate_->GetMatrixInteractor().SetViewSize(size.width, size.height);
         rotate_sphere_->GetMatrixInteractor().SetViewSize(size.width,
                                                           size.height);
         fly_->GetMatrixInteractor().SetViewSize(size.width, size.height);
@@ -697,6 +741,11 @@ public:
         pick_->SetOnInteractorUIUpdated(on_ui);
     }
 
+    void SetModel(const std::string &model,
+                  const geometry::AxisAlignedBoundingBox& scene_bounds,
+                  const Eigen::Vector3f &center) {
+        rotate_->SetModel(model, scene_bounds, center);
+    }
     SceneWidget::Controls GetControls() const {
         if (current_ == rotate_sphere_.get()) {
             return SceneWidget::Controls::ROTATE_CAMERA_SPHERE;
@@ -1249,6 +1298,12 @@ Widget::EventResult SceneWidget::SpaceMouse(const SpaceMouseEvent& e) {
     return Widget::EventResult::CONSUMED;
 }
 #endif
+
+void SceneWidget::SetModel(const std::string &model,
+                           const geometry::AxisAlignedBoundingBox& scene_bounds,
+                           const Eigen::Vector3f &center) {
+    impl_->controls_->SetModel(model, scene_bounds, center);
+}
 Widget::EventResult SceneWidget::Mouse(const MouseEvent& e) {
     // Lower render quality while rotating, since we will be redrawing
     // frequently. This will give a snappier feel to mouse movements,

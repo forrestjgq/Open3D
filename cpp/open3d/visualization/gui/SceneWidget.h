@@ -197,6 +197,9 @@ public:
                                       const char* text);
     void RemoveLabel(std::shared_ptr<Label3D> label);
     void ClearLabels();
+    void SetModel(const std::string &model,
+                  const geometry::AxisAlignedBoundingBox& scene_bounds,
+                  const Eigen::Vector3f &center);
 
     Widget::DrawResult Draw(const DrawContext& context) override;
 
