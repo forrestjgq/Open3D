@@ -53,7 +53,7 @@ void EditModelInteractorLogic::SetModel(const std::string &model,
                                         const geometry::AxisAlignedBoundingBox& scene_bounds,
                                         const Eigen::Vector3f &center) {
     model_ = model;
-    center_of_rotation_ = center;
+    center_of_rotation_ = center; // keep this value unchanged
     SetBoundingBox(scene_bounds);
 }
 
@@ -68,17 +68,12 @@ void EditModelInteractorLogic::Rotate(int dx, int dy) {
     Eigen::Vector3f axis = -dy * x_axis + dx * y_axis;
     axis = axis.normalized();
     float theta = float(CalcRotateRadians(dx, dy));
-    utility::LogInfo("dx {} dy {} height {} rotate theta {} center {} {} {}", dx, dy, view_height_,  theta, center_of_rotation_(0), center_of_rotation_(1), center_of_rotation_(2));
     Eigen::AngleAxisf rot_matrix(theta, axis);
 
     // Rotations about a point using a world axis do not produce
     // a matrix that can be applied to any matrix; each individual
     // matrix must be rotated around the point.
     Camera::Transform t = transform_at_mouse_down_;
-    auto trans = t.translation();
-//    t.translate(center_of_rotation_-trans);
-    auto trans1 = t.translation();
-    utility::LogInfo("trans {} {} {} trans1 {} {} {}", trans(0), trans(1), trans(2), trans1(0), trans1(1), trans1(2));
     t.translate(center_of_rotation_);
     t.fromPositionOrientationScale(t.translation(),
                                    rot_matrix * t.rotation(),
@@ -93,24 +88,18 @@ void EditModelInteractorLogic::RotateZ(int dx, int dy) {
     Eigen::AngleAxisf rot_matrix(rad, camera_->GetForwardVector());
 
     Camera::Transform t = transform_at_mouse_down_;
-    auto trans = t.translation();
-    t.translate(-trans);
-    t.fromPositionOrientationScale(Eigen::Vector3f(0, 0, 0),
+    t.translate(center_of_rotation_);
+    t.fromPositionOrientationScale(t.translation(),
                                    rot_matrix * t.rotation(),
                                    Eigen::Vector3f(1, 1, 1));
-    t.translate(trans);
+    t.translate(-center_of_rotation_);
     scene_->GetScene()->SetGeometryTransform(model_, t);
     UpdateBoundingBox(Camera::Transform(rot_matrix));
 }
 
 void EditModelInteractorLogic::Dolly(float dy, DragType drag_type) {
     float z_dist = CalcDollyDist(dy, drag_type, matrix_at_mouse_down_);
-    auto fv = camera_->GetForwardVector();
     Eigen::Vector3f world_move = -z_dist * camera_->GetForwardVector();
-    utility::LogInfo("dy {} dist {}", dy, z_dist);
-    utility::LogInfo("fv {} {} {}", fv(0), fv(1), fv(2));
-    utility::LogInfo("wm {} {} {}", world_move(0), world_move(1), world_move(2));
-    utility::LogInfo("center {} {} {}", center_of_rotation_(0), center_of_rotation_(1), center_of_rotation_(2));
 
     Camera::Transform t;
     if (drag_type == DragType::MOUSE) {
@@ -118,25 +107,14 @@ void EditModelInteractorLogic::Dolly(float dy, DragType drag_type) {
     } else {
         t = scene_->GetScene()->GetGeometryTransform(model_);
     }
-    utility::LogInfo("before");
-    utility::LogInfo("{} {} {} {}", t(0, 0), t(0, 1), t(0,2), t(0,3));
-    utility::LogInfo("{} {} {} {}", t(1, 0), t(1, 1), t(1,2), t(1,3));
-    utility::LogInfo("{} {} {} {}", t(2, 0), t(2, 1), t(2,2), t(2,3));
-    utility::LogInfo("{} {} {} {}", t(3, 0), t(3, 1), t(3,2), t(3,3));
     Eigen::Vector3f new_trans = t.translation() + world_move;
     t.fromPositionOrientationScale(new_trans, t.rotation(),
                                    Eigen::Vector3f(1, 1, 1));
-    utility::LogInfo("after");
-    utility::LogInfo("{} {} {} {}", t(0, 0), t(0, 1), t(0,2), t(0,3));
-    utility::LogInfo("{} {} {} {}", t(1, 0), t(1, 1), t(1,2), t(1,3));
-    utility::LogInfo("{} {} {} {}", t(2, 0), t(2, 1), t(2,2), t(2,3));
-    utility::LogInfo("{} {} {} {}", t(3, 0), t(3, 1), t(3,2), t(3,3));
     scene_->GetScene()->SetGeometryTransform(model_, t);
 
     Camera::Transform t1 = Camera::Transform::Identity();
     t1.translate(world_move);
     UpdateBoundingBox(t1);
-//    center_of_rotation_ = center_of_rotation_ + world_move;
 
     UpdateCameraFarPlane();
 }
@@ -149,7 +127,6 @@ void EditModelInteractorLogic::Pan(int dx, int dy) {
     t.fromPositionOrientationScale(new_trans, t.rotation(),
                                    Eigen::Vector3f(1, 1, 1));
     scene_->GetScene()->SetGeometryTransform(model_, t);
-//    center_of_rotation_ = center_of_rotation_at_mouse_down_ + world_move;
     Camera::Transform t1 = Camera::Transform::Identity();
     t1.translate(world_move);
     UpdateBoundingBox(t1);
