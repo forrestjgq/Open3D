@@ -53,7 +53,7 @@ protected:
     double min_far_plane_;
     Camera *camera_;
 
-    Eigen::Vector3f CalcPanVectorWorld(int dx, int dy);
+    virtual Eigen::Vector3f CalcPanVectorWorld(int dx, int dy);
     void UpdateCameraFarPlane();
 };
 

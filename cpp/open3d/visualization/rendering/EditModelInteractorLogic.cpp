@@ -51,10 +51,14 @@ void EditModelInteractorLogic::SetBoundingBox(
 
 void EditModelInteractorLogic::SetModel(const std::string &model,
                                         const geometry::AxisAlignedBoundingBox& scene_bounds,
-                                        const Eigen::Vector3f &center) {
+                                        const Eigen::Vector3f &center,
+                                        const Camera::Transform &transform) {
     model_ = model;
-    center_of_rotation_ = center; // keep this value unchanged
-    SetBoundingBox(scene_bounds);
+    if (!model_.empty()) {
+        center_of_rotation_ = center; // keep this value unchanged
+        SetBoundingBox(scene_bounds);
+        scene_->GetScene()->SetGeometryTransform(model_, transform);
+    }
 }
 
 bool EditModelInteractorLogic::HasModel() {
@@ -119,6 +123,35 @@ void EditModelInteractorLogic::Dolly(float dy, DragType drag_type) {
     UpdateCameraFarPlane();
 }
 
+Eigen::Vector3f EditModelInteractorLogic::CalcPanVectorWorld(int dx, int dy) {
+    // Calculate the depth to the pixel we clicked on, so that we
+    // can compensate for perspective and have the mouse stays on
+    // that location. Unfortunately, we don't really have access to
+    // the depth buffer with Filament, so we'll fake it by finding
+    // the depth of the center of rotation.
+    auto center = transform_at_mouse_down_ * center_of_rotation_at_mouse_down_;
+    auto pos = camera_->GetPosition();
+    auto forward = camera_->GetForwardVector();
+    float near = float(camera_->GetNear());
+    float dist = forward.dot(center - pos);
+    dist = std::max(near, dist);
+
+    // How far is one pixel?
+    float half_fov = float(camera_->GetFieldOfView() / 2.0);
+    float hal_fov_radians = half_fov * float(M_PI / 180.0);
+    float units_at_dist = 2.0f * std::tan(hal_fov_radians) * (near + dist);
+    float units_per_px = units_at_dist / float(view_height_);
+
+    // Move camera and center of rotation. Adjust values from the
+    // original positions at mousedown to avoid hysteresis problems.
+    // Note that the interactor's matrix may not be the same as the
+    // camera's matrix.
+    Eigen::Vector3f camera_local_move(-dx * units_per_px, dy * units_per_px, 0);
+    Eigen::Vector3f world_move =
+            camera_->GetModelMatrix().rotation() * camera_local_move;
+
+    return world_move;
+}
 void EditModelInteractorLogic::Pan(int dx, int dy) {
     Eigen::Vector3f world_move = CalcPanVectorWorld(-dx, -dy);
 

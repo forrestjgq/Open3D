@@ -51,7 +51,8 @@ public:
 
     void SetModel(const std::string &model,
                   const geometry::AxisAlignedBoundingBox& scene_bounds,
-                  const Eigen::Vector3f &center);
+                  const Eigen::Vector3f &center,
+                  const Camera::Transform &transform);
     bool HasModel();
 
     void Rotate(int dx, int dy) override;
@@ -63,6 +64,8 @@ public:
     void UpdateMouseDragUI() override;
     void EndMouseDrag() override;
 
+protected:
+    Eigen::Vector3f CalcPanVectorWorld(int dx, int dy) override;
 private:
     Open3DScene* scene_;
     std::string model_;

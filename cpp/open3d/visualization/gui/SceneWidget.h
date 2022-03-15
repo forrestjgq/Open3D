@@ -99,7 +99,8 @@ public:
         ROTATE_SUN,
         ROTATE_IBL,
         ROTATE_MODEL,
-        PICK_POINTS
+        PICK_POINTS,
+        MODEL_EDIT,
     };
     void SetViewControls(Controls mode);
 
@@ -199,7 +200,8 @@ public:
     void ClearLabels();
     void SetModel(const std::string &model,
                   const geometry::AxisAlignedBoundingBox& scene_bounds,
-                  const Eigen::Vector3f &center);
+                  const Eigen::Vector3f &center,
+                  const Eigen::Matrix4d &transform);
 
     Widget::DrawResult Draw(const DrawContext& context) override;
 
