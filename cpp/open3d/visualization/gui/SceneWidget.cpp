@@ -441,35 +441,38 @@ public:
         return bool(model_controls_) && model_controls_->HasModel();
         }
 #ifdef USE_SPNAV
-//    void SpaceMouse(const ::open3d::visualization::SpaceMouseEvent& evt) override {
-//        if (evt.type == ::open3d::visualization::SpaceMouseEvent::MOTION) {
-//            auto e = evt;
-//            //            utility::LogInfo("r({} {} {}) ({} {} {})",
-//            //                             e.motion.rx, e.motion.ry, e.motion.rz,
-//            //                             e.motion.x, e.motion.y, e.motion.z
-//            //            );
-//
-//            e.adjust(5, 5, 10, 10, 1, 10);
-//            if (e.motion.ry != 0 || e.motion.rx != 0) {
-//                camera_controls_->StartMouseDrag();
-//                camera_controls_->Rotate(e.motion.ry, -e.motion.rx);
-//            }
-//            if (e.motion.rz != 0) {
-//                camera_controls_->StartMouseDrag();
-//                camera_controls_->RotateZ(0, -e.motion.rz);
-//            }
-//            if (e.motion.x != 0 || e.motion.z != 0) {
-//                camera_controls_->StartMouseDrag();
-//                camera_controls_->Pan(e.motion.x, -e.motion.z);
-//            }
-//            if (e.motion.y != 0) {
-//                auto y = (float)(-e.motion.y)/15.0f;
-//                camera_controls_->Dolly(y, rendering::MatrixInteractorLogic::
-//                DragType::SPACE_MOUSE);
-//            }
-//            camera_controls_->EndMouseDrag();
-//        }
-//    }
+    void SpaceMouse(const ::open3d::visualization::SpaceMouseEvent& evt) override {
+        if (!HasModel()) {
+            return;
+        }
+        if (evt.type == ::open3d::visualization::SpaceMouseEvent::MOTION) {
+            auto e = evt;
+            //            utility::LogInfo("r({} {} {}) ({} {} {})",
+            //                             e.motion.rx, e.motion.ry, e.motion.rz,
+            //                             e.motion.x, e.motion.y, e.motion.z
+            //            );
+
+            e.adjust(5, 5, 10, 10, 1, 10);
+            if (e.motion.ry != 0 || e.motion.rx != 0) {
+                interactor_->StartMouseDrag();
+                interactor_->Rotate(e.motion.ry, -e.motion.rx);
+            }
+            if (e.motion.rz != 0) {
+                interactor_->StartMouseDrag();
+                interactor_->RotateZ(0, -e.motion.rz);
+            }
+            if (e.motion.x != 0 || e.motion.z != 0) {
+                interactor_->StartMouseDrag();
+                interactor_->Pan(e.motion.x, -e.motion.z);
+            }
+            if (e.motion.y != 0) {
+                auto y = (float)(-e.motion.y)/15.0f;
+                interactor_->Dolly(y, rendering::MatrixInteractorLogic::
+                DragType::SPACE_MOUSE);
+            }
+            interactor_->EndMouseDrag();
+        }
+    }
 #endif
     void Mouse(const MouseEvent& e) override {
         if (HasModel()) {
@@ -835,7 +838,7 @@ public:
     }
 #ifdef USE_SPNAV
     void SpaceMouse(const ::open3d::visualization::SpaceMouseEvent& e) {
-        if (current_ == editor_.get()) {
+        if (current_ == editor_.get() && !editor_->HasModel()) {
             rotate_->SpaceMouse(e);
         } else {
             current_->SpaceMouse(e);
