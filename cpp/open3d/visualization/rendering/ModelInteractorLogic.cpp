@@ -24,6 +24,7 @@
 // IN THE SOFTWARE.
 // ----------------------------------------------------------------------------
 
+#include "open3d/utility/Logging.h"
 #include "open3d/visualization/rendering/ModelInteractorLogic.h"
 
 #include <Eigen/src/Core/Transpose.h>
@@ -97,6 +98,11 @@ void ModelInteractorLogic::RotateZ(int dx, int dy) {
 void ModelInteractorLogic::Dolly(float dy, DragType drag_type) {
     float z_dist = CalcDollyDist(dy, drag_type, matrix_at_mouse_down_);
     Eigen::Vector3f world_move = -z_dist * camera_->GetForwardVector();
+    auto fv = camera_->GetForwardVector();
+    utility::LogInfo("dy {} dist {}", dy, z_dist);
+    utility::LogInfo("fv {} {} {}", fv(0), fv(1), fv(2));
+    utility::LogInfo("wm {} {} {}", world_move(0), world_move(1), world_move(2));
+    utility::LogInfo("center {} {} {}", center_of_rotation_(0), center_of_rotation_(1), center_of_rotation_(2));
 
     for (auto o : transforms_at_mouse_down_) {
         Camera::Transform t;
@@ -105,9 +111,20 @@ void ModelInteractorLogic::Dolly(float dy, DragType drag_type) {
         } else {
             t = scene_->GetScene()->GetGeometryTransform(o.first);
         }
+        utility::LogInfo("geometry: {}", o.first.c_str());
+            utility::LogInfo("before");
+            utility::LogInfo("{} {} {} {}", t(0, 0), t(0, 1), t(0,2), t(0,3));
+            utility::LogInfo("{} {} {} {}", t(1, 0), t(1, 1), t(1,2), t(1,3));
+            utility::LogInfo("{} {} {} {}", t(2, 0), t(2, 1), t(2,2), t(2,3));
+            utility::LogInfo("{} {} {} {}", t(3, 0), t(3, 1), t(3,2), t(3,3));
         Eigen::Vector3f new_trans = t.translation() + world_move;
         t.fromPositionOrientationScale(new_trans, t.rotation(),
                                        Eigen::Vector3f(1, 1, 1));
+            utility::LogInfo("after");
+            utility::LogInfo("{} {} {} {}", t(0, 0), t(0, 1), t(0,2), t(0,3));
+            utility::LogInfo("{} {} {} {}", t(1, 0), t(1, 1), t(1,2), t(1,3));
+            utility::LogInfo("{} {} {} {}", t(2, 0), t(2, 1), t(2,2), t(2,3));
+            utility::LogInfo("{} {} {} {}", t(3, 0), t(3, 1), t(3,2), t(3,3));
         scene_->GetScene()->SetGeometryTransform(o.first, t);
     }
 

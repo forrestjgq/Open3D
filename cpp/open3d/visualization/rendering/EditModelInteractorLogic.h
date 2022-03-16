@@ -26,35 +26,52 @@
 
 #pragma once
 
-#include "open3d/visualization/rendering/MatrixInteractorLogic.h"
+#include <map>
+
+#include "open3d/visualization/rendering/RendererHandle.h"
+#include "open3d/visualization/rendering/RotationInteractorLogic.h"
 
 namespace open3d {
 namespace visualization {
 namespace rendering {
 
-class RotationInteractorLogic : public MatrixInteractorLogic {
-    using Super = MatrixInteractorLogic;
+class Open3DScene;
+
+class EditModelInteractorLogic : public RotationInteractorLogic {
+    using Super = RotationInteractorLogic;
 
 public:
-    explicit RotationInteractorLogic(Camera *camera, double min_far_plane);
-    ~RotationInteractorLogic();
+    EditModelInteractorLogic(Open3DScene* scene,
+                         Camera* camera,
+                         double min_far_plane);
+    virtual ~EditModelInteractorLogic();
 
-    virtual void SetCenterOfRotation(const Eigen::Vector3f &center);
+    void SetBoundingBox(
+            const geometry::AxisAlignedBoundingBox& bounds) override;
 
-    // Panning is always relative to the camera's left (x) and up (y)
-    // axis. Modifies center of rotation and the matrix.
-    virtual void Pan(int dx, int dy);
+    void SetModel(const std::string &model,
+                  const geometry::AxisAlignedBoundingBox& scene_bounds,
+                  const Eigen::Vector3f &center,
+                  const Camera::Transform &transform);
+    bool HasModel();
 
-    virtual void StartMouseDrag();
-    virtual void UpdateMouseDragUI();
-    virtual void EndMouseDrag();
+    void Rotate(int dx, int dy) override;
+    void RotateZ(int dx, int dy) override;
+    void Dolly(float dy, DragType drag_type) override;
+    void Pan(int dx, int dy) override;
+
+    void StartMouseDrag() override;
+    void UpdateMouseDragUI() override;
+    void EndMouseDrag() override;
 
 protected:
-    double min_far_plane_;
-    Camera *camera_;
+    Eigen::Vector3f CalcPanVectorWorld(int dx, int dy) override;
+private:
+    Open3DScene* scene_;
+    std::string model_;
+    Camera::Transform transform_at_mouse_down_;
 
-    virtual Eigen::Vector3f CalcPanVectorWorld(int dx, int dy);
-    void UpdateCameraFarPlane();
+    void UpdateBoundingBox(const Camera::Transform& t);
 };
 
 }  // namespace rendering

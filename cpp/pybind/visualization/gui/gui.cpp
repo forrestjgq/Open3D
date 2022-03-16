@@ -64,6 +64,7 @@
 #include "open3d/visualization/gui/Window.h"
 #include "open3d/visualization/rendering/Open3DScene.h"
 #include "open3d/visualization/rendering/Renderer.h"
+#include "open3d/visualization/rendering/MaterialRecord.h"
 #include "open3d/visualization/rendering/Scene.h"
 #include "open3d/visualization/rendering/filament/FilamentEngine.h"
 #include "open3d/visualization/rendering/filament/FilamentRenderToBuffer.h"
@@ -1315,12 +1316,38 @@ void pybind_gui_classes(py::module &m) {
             SetViewControls(mode);
             SetPickableGeometry({});
         }
+        void StartModelEdit(std::shared_ptr<geometry::Geometry3D> geometry,
+                            const rendering::MaterialRecord &record,
+                            const Eigen::Matrix4d &transform) {
+            auto s = GetScene();
+            s->AddGeometry(model_name_, geometry.get(), record);
+            auto bbox = geometry->GetAxisAlignedBoundingBox();
+            auto center = bbox.GetCenter().cast<float>();
+            SetModel(model_name_, bbox, center, transform);
+        }
+        Eigen::Matrix4d GetModelTransform() {
+            auto s = GetScene()->GetScene();
+            auto t = s->GetGeometryTransform(model_name_);
+            return t.matrix().cast<double>();
+        }
+        Eigen::Matrix4d StopModelEdit(Controls mode) {
+            auto bbox = geometry::AxisAlignedBoundingBox{};
+            auto center = bbox.GetCenter().cast<float>();
+            SetModel("", bbox, center, Eigen::Matrix4d::Identity());
+            SetViewControls(mode);
+
+            auto s = GetScene()->GetScene();
+            auto t = s->GetGeometryTransform(model_name_);
+            GetScene()->RemoveGeometry(model_name_);
+            return t.matrix().cast<double>();
+        }
 
     private:
         PickMap picking_;
         PickNotify on_picked_;
         std::function<int(const MouseEvent &)> on_mouse_;
         std::function<int(const KeyEvent &)> on_key_;
+        const std::string model_name_ {"___model__editor___"};
     };
 
     py::class_<PySceneWidget, UnownedPointer<PySceneWidget>, Widget> scene(
@@ -1341,6 +1368,7 @@ void pybind_gui_classes(py::module &m) {
             .value("ROTATE_IBL", SceneWidget::Controls::ROTATE_IBL)
             .value("ROTATE_MODEL", SceneWidget::Controls::ROTATE_MODEL)
             .value("PICK_POINTS", SceneWidget::Controls::PICK_POINTS)
+            .value("MODEL_EDIT", SceneWidget::Controls::MODEL_EDIT)
             .export_values();
 
     scene.def(py::init<>(),
@@ -1419,6 +1447,12 @@ void pybind_gui_classes(py::module &m) {
                  "Start picking point")
             .def("stop_pick", &PySceneWidget::StopPickPoint,
                  "Stop picking point")
+            .def("start_model_edit", &PySceneWidget::StartModelEdit,
+                 "Start editing model, view control will be switched")
+            .def("stop_model_edit", &PySceneWidget::StopModelEdit,
+                 "Stop editing model and switch to target view control")
+            .def("get_model_transform", &PySceneWidget::GetModelTransform,
+                 "Get model transformation")
             ;
 
     // ---- Slider ----

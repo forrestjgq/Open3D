@@ -59,6 +59,7 @@ if (BUILD_GUI)
         rendering/MaterialModifier.cpp
         rendering/MatrixInteractorLogic.cpp
         rendering/ModelInteractorLogic.cpp
+        rendering/EditModelInteractorLogic.cpp
         rendering/Open3DScene.cpp
         rendering/Renderer.cpp
         rendering/RendererHandle.cpp
