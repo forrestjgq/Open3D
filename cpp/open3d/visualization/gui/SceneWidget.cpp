@@ -452,7 +452,11 @@ public:
             //                             e.motion.x, e.motion.y, e.motion.z
             //            );
 
-            e.adjust(5, 5, 10, 10, 1, 10);
+            if (e.motion.sensitive) {
+                e.adjust(5, 5, 10, 10, 1, 10);
+            } else {
+                e.adjust(15, 15, 25, 25, 10, 30);
+            }
             if (e.motion.ry != 0 || e.motion.rx != 0) {
                 interactor_->StartMouseDrag();
                 interactor_->Rotate(e.motion.ry, -e.motion.rx);
@@ -511,7 +515,11 @@ public:
 //                             e.motion.x, e.motion.y, e.motion.z
 //            );
 
-            e.adjust(5, 5, 10, 10, 1, 10);
+            if (e.motion.sensitive) {
+                e.adjust(5, 5, 10, 10, 1, 10);
+            } else {
+                e.adjust(15, 15, 25, 25, 10, 30);
+            }
             if (e.motion.ry != 0 || e.motion.rx != 0) {
                 camera_controls_->StartMouseDrag();
                 camera_controls_->Rotate(e.motion.ry, -e.motion.rx);
@@ -829,6 +837,7 @@ public:
                 break;
             case SceneWidget::Controls::MODEL_EDIT:
                 if (editor_->HasModel()) {
+                    space_mouse_to_editor_ = true;
                     current_ = editor_.get();
                 } else {
                     utility::LogWarning("Set view control to MODEL_EDIT fails");
@@ -837,9 +846,30 @@ public:
         }
     }
 #ifdef USE_SPNAV
-    void SpaceMouse(const ::open3d::visualization::SpaceMouseEvent& e) {
-        if (current_ == editor_.get() && !editor_->HasModel()) {
-            rotate_->SpaceMouse(e);
+    void SpaceMouse(const ::open3d::visualization::SpaceMouseEvent& evt) {
+        auto e = evt;
+        if (e.type == SpaceMouseEvent::BUTTON && e.button.press == 1 &&
+            e.button.btn_num == 1) {
+            space_mouse_sensitive_ = !space_mouse_sensitive_;
+            utility::LogInfo("space mouse sensitivity: {}", space_mouse_sensitive_ ? "high" : "low");
+        }
+        e.motion.sensitive = space_mouse_sensitive_;
+
+        if (current_ == editor_.get()) {
+            if (editor_->HasModel()) {
+                if (e.type == SpaceMouseEvent::BUTTON && e.button.press == 1 &&
+                    e.button.btn_num == 0) {
+                    space_mouse_to_editor_ = !space_mouse_to_editor_;
+                    utility::LogInfo("space mouse switch to {}", space_mouse_to_editor_ ? "model" : "scene");
+                }
+                if (space_mouse_to_editor_) {
+                    editor_->SpaceMouse(e);
+                } else {
+                    rotate_->SpaceMouse(e);
+                }
+            } else {
+                rotate_->SpaceMouse(e);
+            }
         } else {
             current_->SpaceMouse(e);
         }
@@ -882,6 +912,8 @@ public:
 
 private:
     bool sun_interactor_enabled_ = true;
+    bool space_mouse_to_editor_ = true;
+    bool space_mouse_sensitive_ = true;
 
     std::unique_ptr<RotateCameraInteractor> rotate_;
     std::unique_ptr<EditModelInteractor> editor_;

@@ -45,6 +45,7 @@ struct SpaceMouseEvent {
             int x, y, z;
             int rx, ry, rz;
             unsigned int period;
+            bool sensitive;
         } motion;
         struct {
             bool press;
