@@ -31,6 +31,7 @@
 #include "open3d/visualization/rendering/View.h"
 #include "open3d/visualization/rendering/Open3DScene.h"
 #include "open3d/geometry/PointCloud.h"
+#include "open3d/utility/Logging.h"
 
 namespace open3d {
 namespace visualization {
@@ -234,6 +235,10 @@ Widget::EventResult Editor::Mouse(const MouseEvent& e) {
             AddPoint(e.x, e.y);
             return Widget::EventResult::CONSUMED;
         }
+        if (type_ == SelectionType::Polygon) {
+            UpdatePolygonPoint(e.x, e.y);
+            return Widget::EventResult::CONSUMED;
+        }
     }
     return Widget::EventResult::DISCARD;
 }
@@ -287,6 +292,39 @@ Widget::DrawResult Editor::Draw(const DrawContext& context, const Rect& frame) {
     }
     return Widget::DrawResult::NONE;
 }
+bool Editor::CheckPolygonPoint(int x, int y) {
+    Eigen::Vector2i p(x, y);
+    auto segs = selection_.size() - 1;
+    auto discard = false;
+    if (segs >= 2) {
+        // seg by last point and new
+        Seg<int> s0(selection_[selection_.size()-1], p);
+        // seg by first point and new
+        Seg<int> s1(selection_[0], p);
+
+        for (size_t idx = 0; !discard && idx < selection_.size()-1; ++idx) {
+            Seg<int> s(selection_[idx], selection_[idx+1]);
+            bool last = idx == selection_.size() - 2;
+            bool first = idx == 0;
+            discard = (!last && s0.cross(s)) || (!first && s1.cross(s));
+        }
+    }
+    return !discard;
+}
+void Editor::UpdatePolygonPoint(int x, int y) {
+    if (selection_.empty()) {
+        return;
+    }
+    // update last selection with current, pop back first
+    // and check if (x, y) is crossing to current selections.
+    auto last = selection_.back();
+    selection_.pop_back();
+    if (!CheckPolygonPoint(x, y)) {
+        selection_.push_back(last);
+    } else {
+        selection_.emplace_back(x, y);
+    }
+}
 void Editor::AddPoint(int x, int y) {
     if (type_ == SelectionType::None) {
         return;
@@ -304,31 +342,11 @@ void Editor::AddPoint(int x, int y) {
                 selection_.back() = Eigen::Vector2i(x, y);
             }
             break;
-        case SelectionType::Polygon: {
-            Eigen::Vector2i p(x, y);
-            auto segs = selection_.size() - 1;
-            auto discard = false;
-            if (segs > 2) {
-                // seg by last point and new
-                Seg<int> s0(selection_[selection_.size()-1], p);
-                // seg by first point and new
-                Seg<int> s1(selection_[0], p);
-
-                for (size_t idx = 0;
-                     !discard && idx < selection_.size()-1;
-                     ++idx) {
-                    Seg<int> s(selection_[idx], selection_[idx+1]);
-                    bool last = idx == selection_.size() - 2;
-                    bool first = idx == 0;
-                    discard = (!last && s0.cross(s)) ||
-                              (!first && s1.cross(s));
-                }
-            }
-            if (!discard) {
-                selection_.push_back(p);
+        case SelectionType::Polygon:
+            if (CheckPolygonPoint(x, y)) {
+                selection_.emplace_back(x, y);
             }
             break;
-        }
         default:
             break;
     }

@@ -66,6 +66,8 @@ private:
     void CheckEditable();
     bool AllowEdit();
     bool Started();
+    void UpdatePolygonPoint(int x, int y);
+    bool CheckPolygonPoint(int x, int y);
     void AddPoint(int x, int y);
     Eigen::Vector2f PointAt(int i);
     Eigen::Vector2f PointAt(int i, int x, int y);
