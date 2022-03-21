@@ -1438,6 +1438,24 @@ void pybind_gui_classes(py::module &m) {
                  "at the specified 3D point.")
             .def("remove_3d_label", &PySceneWidget::RemoveLabel,
                  "Removes the 3D text label from the scene")
+            .def("start_edit", &PySceneWidget::StartEdit,
+                 "Start geometry editing by drawing 2D shapes."
+                 "Currently only PointCloud and TriangleMesh are supported."
+                 "This works only in ROTATE_CAMERA view mode."
+                 "How to draw 2D shape:"
+                 " 1. Alt + LeftMouseDrag for a rectangle"
+                 " 2. Shift + LeftMouseDraw for circle from center to edge"
+                 " 3. Ctrl + Left Clicks for a polygon, specially, "
+                 "    Ctrl + LeftMouseDrag to change vertex position "
+                 "    dynamically, and Right click to cancel the latest vertex"
+                 " 4. Middle click to cancel all points")
+            .def("stop_edit", &PySceneWidget::StopEdit,
+                 "Stop geometry editing editing")
+            .def("collect_selected_indices",
+                 &PySceneWidget::CollectSelectedIndices,
+                 "Collect selected indices from geometry. For PointCloud the "
+                 "indices of points is collected and for TriangleMesh the "
+                 "indices of vertices is collected.")
             .def("pick_point", &PySceneWidget::StartPickPoint,
                  "Start picking point")
             .def("stop_pick", &PySceneWidget::StopPickPoint,
