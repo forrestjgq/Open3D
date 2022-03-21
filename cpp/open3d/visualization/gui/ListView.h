@@ -55,6 +55,7 @@ public:
     /// as possible, otherwise the list will at least show 3 items and
     /// at most show \ref num items.
     void SetMaxVisibleItems(int num);
+    void SetMinVisibleItems(int num);
 
     Size CalcPreferredSize(const LayoutContext& context,
                            const Constraints& constraints) const override;

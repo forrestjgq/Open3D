@@ -41,7 +41,6 @@ namespace gui {
 namespace {
 static const int NO_SELECTION = -1;
 static int g_next_list_box_id = 1;
-static const int g_min_visible_items = 3;
 }  // namespace
 
 struct ListView::Impl {
@@ -49,6 +48,7 @@ struct ListView::Impl {
     std::vector<std::string> items_;
     int selected_index_ = NO_SELECTION;
     int max_visible_item_ = -1;
+    int min_visible_item_ = 3;
     std::function<void(const char *, bool)> on_value_changed_;
 };
 
@@ -76,10 +76,17 @@ const char *ListView::GetSelectedValue() const {
 
 void ListView::SetMaxVisibleItems(int num) {
     if (num > 0) {
-        impl_->max_visible_item_ = std::max(g_min_visible_items, num);
+        impl_->max_visible_item_ = std::max(impl_->min_visible_item_, num);
     } else {
         // unlimited, will make height be DIM_GROW
         impl_->max_visible_item_ = -1;
+    }
+}
+void ListView::SetMinVisibleItems(int num) {
+    if (num > 0) {
+        impl_->min_visible_item_ = std::min(impl_->max_visible_item_, num);
+    } else {
+        impl_->min_visible_item_ = 3;
     }
 }
 void ListView::SetSelectedIndex(int index) {
@@ -107,9 +114,9 @@ Size ListView::CalcPreferredSize(const LayoutContext &context,
     }
     auto h = Widget::DIM_GROW;
     if (impl_->max_visible_item_ > 0) {
-        // make sure show at least g_min_visible_items items, and
+        // make sure show at least impl_->min_visible_item_ items, and
         // at most max_visible_item_ items.
-        h = std::max((int)impl_->items_.size(), g_min_visible_items);
+        h = std::max((int)impl_->items_.size(), impl_->min_visible_item_);
         h = std::min(h, impl_->max_visible_item_);
         h = int(std::ceil((float)h * fh));
     }
@@ -117,7 +124,7 @@ Size ListView::CalcPreferredSize(const LayoutContext &context,
 }
 
 Size ListView::CalcMinimumSize(const LayoutContext &context) const {
-    return Size(0, g_min_visible_items * context.theme.font_size);
+    return Size(0, impl_->min_visible_item_ * context.theme.font_size);
 }
 
 Widget::DrawResult ListView::Draw(const DrawContext &context) {

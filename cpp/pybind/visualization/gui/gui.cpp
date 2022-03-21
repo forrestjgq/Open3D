@@ -1117,6 +1117,8 @@ void pybind_gui_classes(py::module &m) {
                  "Set to negative number will make list extends vertically "
                  "as much as possible, otherwise the list will at least show "
                  "3 items and at most show num items.")
+            .def("set_min_visible_items", &ListView::SetMinVisibleItems,
+                 "Limit the min visible items shown to user.")
             .def_property("selected_index", &ListView::GetSelectedIndex,
                           &ListView::SetSelectedIndex,
                           "The index of the currently selected item")
