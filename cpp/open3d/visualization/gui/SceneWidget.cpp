@@ -39,11 +39,11 @@
 #include "open3d/visualization/gui/Application.h"
 #include "open3d/visualization/gui/Color.h"
 #include "open3d/visualization/gui/Events.h"
+#include "open3d/visualization/gui/GeometryEditor.h"
 #include "open3d/visualization/gui/Label.h"
 #include "open3d/visualization/gui/Label3D.h"
 #include "open3d/visualization/gui/PickPointsInteractor.h"
 #include "open3d/visualization/gui/Util.h"
-#include "open3d/visualization/gui/GeometryEditor.h"
 #include "open3d/visualization/rendering/Camera.h"
 #include "open3d/visualization/rendering/CameraInteractorLogic.h"
 #include "open3d/visualization/rendering/EditModelInteractorLogic.h"
@@ -946,7 +946,7 @@ struct SceneWidget::Impl {
     SceneWidget::Quality current_render_quality_ = SceneWidget::Quality::BEST;
     bool scene_caching_enabled_ = false;
     std::vector<Eigen::Vector2i> ui_lines_;
-    std::shared_ptr<Editor> editor_;
+    std::shared_ptr<GeometryEditor> editor_;
     std::unordered_set<std::shared_ptr<Label3D>> labels_3d_;
     struct {
         Eigen::Matrix3d matrix;
@@ -1127,7 +1127,7 @@ void SceneWidget::SetScene(std::shared_ptr<rendering::Open3DScene> scene) {
                     impl_->ui_lines_ = lines;
                     ForceRedraw();
                 });
-        impl_->editor_ = std::make_shared<Editor>(impl_->scene_.get());
+        impl_->editor_ = std::make_shared<GeometryEditor>(impl_->scene_.get());
     }
 }
 
@@ -1147,13 +1147,15 @@ void SceneWidget::DoPolygonPick(PolygonPickAction action) {
     };
 }
 
-void SceneWidget::StartEdit(std::shared_ptr<const geometry::PointCloud> cloud,
-                            std::function<void(bool)> selectionCallback) {
-    impl_->editor_->Start(cloud, selectionCallback);
+bool SceneWidget::StartEdit(
+        std::shared_ptr<const geometry::Geometry3D> geometry,
+        std::function<void(bool)> selectionCallback) {
+    if (impl_->controls_->GetControls() == Controls::ROTATE_CAMERA) {
+        return impl_->editor_->Start(geometry, selectionCallback);
+    }
+    return false;
 }
-void SceneWidget::StopEdit() {
-    impl_->editor_->Stop();
-}
+void SceneWidget::StopEdit() { impl_->editor_->Stop(); }
 
 std::vector<size_t> SceneWidget::CollectSelectedIndices() {
     return impl_->editor_->CollectSelectedIndices();

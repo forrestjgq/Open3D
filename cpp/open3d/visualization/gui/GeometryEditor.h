@@ -36,32 +36,57 @@
 namespace open3d {
 
 namespace geometry {
-class PointCloud;
+class Geometry3D;
 class Image;
-}
+}  // namespace geometry
 
 namespace visualization {
 namespace rendering {
 class Open3DScene;
 class Camera;
-}
+}  // namespace rendering
 
 namespace gui {
-class Editor {
+/// Geometry editor hooked to SceneWidget to collect points from Geometry3D
+/// by drawing 2D shapes. Currently only PointCloud and TriangleMesh are
+/// supported.
+/// This works only in ROTATE_CAMERA view mode.
+/// How to draw 2D shape:
+///   - Alt + LeftMouseDrag for a rectangle
+///   - Shift + LeftMouseDraw for circle from center to edge
+///   - Ctrl + Left Clicks for a polygon, specially, Ctrl + LeftMouseDrag
+///     to change vertex position dynamically, and Right click to cancel
+///     the latest vertex
+///   - Middle click to cancel all points
+class GeometryEditor {
 public:
-    enum class SelectionType { None, Rectangle, Polygon, Circle};
-    using Target = std::shared_ptr<const geometry::PointCloud>;
-    explicit Editor(rendering::Open3DScene* scene);
-    ~Editor() = default;
+    enum class SelectionType { None, Rectangle, Polygon, Circle };
+    using Target = std::shared_ptr<const geometry::Geometry3D>;
 
-    void Start(Target target, std::function<void(bool)> selectionCallback);
+    explicit GeometryEditor(rendering::Open3DScene* scene);
+    ~GeometryEditor() = default;
+
+    /// Start geometry editing.
+    /// @param target Geometry to be edited. This target is supposed to be
+    ///        added into scene before this call.
+    /// @param selectionCallback callback function to notify client the
+    ///        selection area is ready and indices could be collected
+    ///        by CollectSelectedIndices
+    bool Start(Target target, std::function<void(bool)> selectionCallback);
+    /// Stop geometry editing.
     void Stop();
-
+    /// Collect selected indices from geometry. For PointCloud the indices of
+    /// points is collected and for TriangleMesh the indices of vertices is
+    /// collected.
     std::vector<size_t> CollectSelectedIndices();
+
+    /// hooked to SceneWidget Mouse
     Widget::EventResult Mouse(const MouseEvent& e);
-    Widget::DrawResult Draw(const DrawContext& context, const Rect &frame);
+    /// hooked to SceneWidget Draw
+    Widget::DrawResult Draw(const DrawContext& context, const Rect& frame);
 
 private:
+    const std::vector<Eigen::Vector3d>& GetPoints();
     bool SetSelection(SelectionType type);
     void CheckEditable();
     bool AllowEdit();
@@ -74,12 +99,13 @@ private:
     std::vector<size_t> CropPolygon();
     std::vector<size_t> CropRectangle();
     std::vector<size_t> CropCircle();
+
 private:
     rendering::Open3DScene* scene_;
     rendering::Camera* camera_;
     Target target_;
-    bool editable_ = false;
-    std::function<void(bool)> callback_;
+    bool editable_ = false;  // selection area ready flag
+    std::function<void(bool)> selection_callback_;
     std::vector<Eigen::Vector2i> selection_;
     SelectionType type_ = SelectionType::None;
 };
