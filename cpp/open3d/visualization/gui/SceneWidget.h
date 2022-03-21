@@ -189,10 +189,6 @@ public:
     enum class PolygonPickAction { CANCEL = 0, SELECT };
     void DoPolygonPick(PolygonPickAction action);
 
-    void StartEdit(std::shared_ptr<const geometry::PointCloud> cloud,
-                   std::function<void(bool)> selectionCallback);
-    void StopEdit();
-    std::vector<size_t> CollectSelectedIndices();
     // 3D Labels
     std::shared_ptr<Label3D> AddLabel(const Eigen::Vector3f& pos,
                                       const char* text);

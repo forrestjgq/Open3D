@@ -43,7 +43,6 @@
 #include "open3d/visualization/gui/Label3D.h"
 #include "open3d/visualization/gui/PickPointsInteractor.h"
 #include "open3d/visualization/gui/Util.h"
-#include "open3d/visualization/gui/GeometryEditor.h"
 #include "open3d/visualization/rendering/Camera.h"
 #include "open3d/visualization/rendering/CameraInteractorLogic.h"
 #include "open3d/visualization/rendering/EditModelInteractorLogic.h"
@@ -946,7 +945,6 @@ struct SceneWidget::Impl {
     SceneWidget::Quality current_render_quality_ = SceneWidget::Quality::BEST;
     bool scene_caching_enabled_ = false;
     std::vector<Eigen::Vector2i> ui_lines_;
-    std::shared_ptr<Editor> editor_;
     std::unordered_set<std::shared_ptr<Label3D>> labels_3d_;
     struct {
         Eigen::Matrix3d matrix;
@@ -1127,7 +1125,6 @@ void SceneWidget::SetScene(std::shared_ptr<rendering::Open3DScene> scene) {
                     impl_->ui_lines_ = lines;
                     ForceRedraw();
                 });
-        impl_->editor_ = std::make_shared<Editor>(impl_->scene_.get());
     }
 }
 
@@ -1147,17 +1144,6 @@ void SceneWidget::DoPolygonPick(PolygonPickAction action) {
     };
 }
 
-void SceneWidget::StartEdit(std::shared_ptr<const geometry::PointCloud> cloud,
-                            std::function<void(bool)> selectionCallback) {
-    impl_->editor_->Start(cloud, selectionCallback);
-}
-void SceneWidget::StopEdit() {
-    impl_->editor_->Stop();
-}
-
-std::vector<size_t> SceneWidget::CollectSelectedIndices() {
-    return impl_->editor_->CollectSelectedIndices();
-}
 std::shared_ptr<rendering::Open3DScene> SceneWidget::GetScene() const {
     return impl_->scene_;
 }
@@ -1366,10 +1352,6 @@ Widget::DrawResult SceneWidget::Draw(const DrawContext& context) {
         }
     }
 
-    if (impl_->editor_) {
-        impl_->editor_->Draw(context, f);
-    }
-
     ImGui::End();
 
     return Widget::DrawResult::NONE;
@@ -1414,10 +1396,7 @@ Widget::EventResult SceneWidget::Mouse(const MouseEvent& e) {
     MouseEvent local = e;
     local.x -= frame.x;
     local.y -= frame.y;
-    if(!impl_->editor_ ||
-       impl_->editor_->Mouse(local) == Widget::EventResult::DISCARD) {
-        impl_->controls_->Mouse(local);
-    }
+    impl_->controls_->Mouse(local);
 
     if (impl_->on_camera_changed_) {
         impl_->on_camera_changed_(GetCamera());

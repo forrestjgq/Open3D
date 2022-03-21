@@ -1438,13 +1438,6 @@ void pybind_gui_classes(py::module &m) {
                  "at the specified 3D point.")
             .def("remove_3d_label", &PySceneWidget::RemoveLabel,
                  "Removes the 3D text label from the scene")
-            .def("start_edit",
-                 &PySceneWidget::StartEdit,
-                 "Start editing")
-            .def("stop_edit", &PySceneWidget::StopEdit,
-                 "Stop editing")
-            .def("collect_selected_indices", &PySceneWidget::CollectSelectedIndices,
-                 "collect selected indices")
             .def("pick_point", &PySceneWidget::StartPickPoint,
                  "Start picking point")
             .def("stop_pick", &PySceneWidget::StopPickPoint,
