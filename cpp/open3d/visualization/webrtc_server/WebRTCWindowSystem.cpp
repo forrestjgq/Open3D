@@ -110,6 +110,9 @@ static int GetEnvWebRTCFps() {
     return 0;
 }
 
+static std::chrono::high_resolution_clock::time_point now() {
+    return std::chrono::high_resolution_clock::now();
+}
 struct WebRTCWindowSystem::Impl {
     std::unordered_map<WebRTCWindowSystem::OSWindow, std::string>
             os_window_to_uid_;
@@ -132,6 +135,12 @@ struct WebRTCWindowSystem::Impl {
 
     std::unordered_map<std::string, std::function<std::string(std::string)>>
             data_channel_message_callbacks_;
+
+    std::chrono::high_resolution_clock::time_point last_mouse_move_ = now();
+    std::chrono::high_resolution_clock::time_point last_mouse_drag_ = now();
+    std::chrono::high_resolution_clock::time_point last_draw_ = now();
+    long total_frame_ = 0;
+    long abandon_frame_ = 0;
 };
 
 std::shared_ptr<WebRTCWindowSystem> WebRTCWindowSystem::GetInstance() {
@@ -176,7 +185,29 @@ WebRTCWindowSystem::WebRTCWindowSystem()
                 if (value.get("class_name", "").asString() == "MouseEvent" &&
                     os_window != nullptr) {
                     gui::MouseEvent me;
-                    if (me.FromJson(value)) PostMouseEvent(os_window, me);
+                    const int ms = 100;
+                    auto ts = now();
+                    if (me.FromJson(value))  {
+                        if (me.type == gui::MouseEvent::MOVE) {
+                            auto span = std::chrono::duration_cast<std::chrono::duration<double>>(ts - impl_->last_mouse_move_);
+                            auto diff = int(span.count()*1000);
+                            if (diff < ms) {
+                                return "";
+                            }
+                            impl_->last_mouse_move_ = ts;
+//                        } else if (me.type == gui::MouseEvent::DRAG) {
+//                            auto span = std::chrono::duration_cast<std::chrono::duration<double>>(ts - impl_->last_mouse_drag_);
+//                            auto diff = int(span.count()*1000);
+//                            if (diff < ms) {
+//                                return "";
+//                            }
+//                            impl_->last_mouse_drag_ = ts;
+//                        } else if (me.type == gui::MouseEvent::BUTTON_DOWN && me.button.count == 2) {
+//                            utility::LogInfo("recv dbl click, button: {}", me.button.button);
+                        }
+                        PostMouseEvent(os_window, me);
+                    }
+
                 }
                 return "";  // empty string is not sent back
             });
