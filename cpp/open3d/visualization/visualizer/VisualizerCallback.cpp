@@ -139,11 +139,11 @@ void Visualizer::OnSpaceMouseEvent(const SpaceMouseEvent &evt) {
 //                     e.motion.x, e.motion.y, e.motion.z);
     bool flag = false;
     if (e.motion.ry != 0 || e.motion.rx != 0) {
-        view_control_ptr_->Rotate(e.motion.ry, -e.motion.rx);
+        view_control_ptr_->Rotate(e.motion.ry, e.motion.rx);
         flag = true;
     }
     if (e.motion.rz != 0) {
-        view_control_ptr_->Roll(-e.motion.rz);
+        view_control_ptr_->Roll(e.motion.rz);
         flag = true;
     }
     if (e.motion.x != 0 || e.motion.z != 0) {
