@@ -74,7 +74,7 @@ public:
 
     /// Start WebRTC server in a background thread.
     void StartWebRTCServer();
-
+    std::string OnHttpMessage(const std::string& api, const std::string& message);
     /// Client -> server message.
     /// \return Message reply that should be sent back to the client.
     std::string OnDataChannelMessage(const std::string& message);
@@ -112,11 +112,16 @@ public:
     void RegisterDataChannelMessageCallback(
             const std::string& class_name,
             const std::function<std::string(const std::string&)> callback);
+    void RegisterHttpMessageCallback(
+            const std::string& api,
+            const std::function<std::string(const std::string &, const std::string&)> callback);
 
     /// Server -> client frame.
     void OnFrame(const std::string& window_uid,
                  const std::shared_ptr<core::Tensor>& im);
 
+    void SendMessage(const std::string &peerid, const std::string &msg);
+    void SetAllowedPeerid(const std::string &peerid);
     /// Send initial frames. This flushes the WebRTC video stream. After the
     /// initial frames, new frames will only be sent at triggered events.
     void SendInitFrames(const std::string& window_uid);

@@ -51,12 +51,40 @@ static void pybind_webrtc_server_functions(py::module &m) {
             []() { WebRTCWindowSystem::GetInstance()->EnableWebRTC(); },
             "Use WebRTC streams to display rendered gui window.");
     m.def(
+            "set_allowed_peerid",
+            [](const std::string &peerid) {
+              WebRTCWindowSystem::GetInstance()->SetAllowedPeerid(peerid);
+            },
+            "Send allowed peerid, set to - to disable all");
+    m.def(
+            "send_message",
+            [](const std::string &peerid, const std::string &msg) {
+                WebRTCWindowSystem::GetInstance()->SendMessage(peerid, msg);
+            },
+            "Send message to peer");
+    m.def(
             "disable_http_handshake",
             []() { WebRTCWindowSystem::GetInstance()->DisableHttpHandshake(); },
             "Disables the HTTP handshake server. In Jupyter environemnt, "
             "WebRTC handshake is performed by call_http_api() with "
             "Jupyter's own COMMS interface, thus the HTTP server shall "
             "be turned off.");
+    m.def(
+            "register_http_message_callback",
+            [](const std::string &class_name,
+               std::function<std::string(const std::string &, const std::string &)> callback) {
+              return WebRTCWindowSystem::GetInstance()
+                      ->RegisterHttpMessageCallback(class_name, callback);
+            },
+            "api"_a, "callback"_a,
+            R"(
+Register callback for a http message.
+
+When the data channel receives a valid JSON string, the ``api`` property
+of the JSON object will be examined and the corresponding callback function will
+be called. The string return value of the callback will be sent back as a reply,
+if it is not empty.
+            )");
     m.def(
             "register_data_channel_message_callback",
             [](const std::string &class_name,

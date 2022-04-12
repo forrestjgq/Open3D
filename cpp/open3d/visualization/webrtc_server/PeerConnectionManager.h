@@ -260,12 +260,15 @@ class PeerConnectionManager {
             std::string reply =
                     WebRTCWindowSystem::GetInstance()->OnDataChannelMessage(
                             msg);
-            if (!reply.empty()) {
-                webrtc::DataBuffer buffer(reply);
+            Send(reply);
+        }
+
+        void Send(const std::string &msg) {
+            if (!msg.empty()) {
+                webrtc::DataBuffer buffer(msg);
                 data_channel_->Send(buffer);
             }
         }
-
     protected:
         PeerConnectionManager* peer_connection_manager_;
         rtc::scoped_refptr<webrtc::DataChannelInterface> data_channel_;
@@ -293,6 +296,7 @@ class PeerConnectionManager {
             if (pc_.get()) {
                 rtc::scoped_refptr<webrtc::DataChannelInterface> channel =
                         pc_->CreateDataChannel("ServerDataChannel", nullptr);
+                utility::LogInfo("create local chan ServerDataChannel");
                 local_channel_ = new DataChannelObserver(
                         peer_connection_manager_, channel, peerid_);
             }
@@ -308,6 +312,19 @@ class PeerConnectionManager {
                 // warning: pc->close call OnIceConnectionChange
                 deleting_ = true;
                 pc_->Close();
+            }
+        }
+
+
+        DataChannelObserver* GetRemoteChannel() {
+            return remote_channel_;
+        }
+        DataChannelObserver* GetLocalChannel() {
+            return local_channel_;
+        }
+        void SendMessage(const std::string &msg) {
+            if (remote_channel_) {
+                remote_channel_->Send(msg);
             }
         }
 
@@ -344,8 +361,8 @@ class PeerConnectionManager {
         }
         virtual void OnDataChannel(
                 rtc::scoped_refptr<webrtc::DataChannelInterface> channel) {
-            utility::LogDebug(
-                    "PeerConnectionObserver::OnDataChannel peerid: {}",
+            utility::LogInfo(
+                    "PeerConnectionObserver::OnDataChannel remote channel peerid: {}",
                     peerid_);
             remote_channel_ = new DataChannelObserver(peer_connection_manager_,
                                                       channel, peerid_);
@@ -403,6 +420,9 @@ public:
                           const std::string& webrtc_udp_port_range);
     virtual ~PeerConnectionManager();
 
+    void SetAllowedPeerid(const std::string &peerid) {
+        allowed_peerid_ = peerid;
+    }
     bool InitializePeerConnection();
     const std::map<std::string, HttpServerRequestHandler::HttpFunction>
     GetHttpApi();
@@ -425,6 +445,19 @@ public:
     void OnFrame(const std::string& window_uid,
                  const std::shared_ptr<core::Tensor>& im);
 
+    void SendMessage(const std::string &peerid, const std::string &msg) {
+        PeerConnectionObserver *obs = nullptr;
+        {
+            std::lock_guard<std::mutex> mutex_lock(peerid_to_connection_mutex_);
+            auto it = peerid_to_connection_.find(peerid);
+            if (it != peerid_to_connection_.end()) {
+                obs = it->second;
+            }
+        }
+        if (obs) {
+            obs->SendMessage(msg);
+        }
+    }
 protected:
     rtc::scoped_refptr<BitmapTrackSourceInterface> GetVideoTrackSource(
             const std::string& window_uid);
@@ -444,6 +477,7 @@ protected:
     rtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface>
             peer_connection_factory_;
 
+    std::string allowed_peerid_;
     // Each peer has exactly one connection.
     std::unordered_map<std::string, PeerConnectionObserver*>
             peerid_to_connection_;

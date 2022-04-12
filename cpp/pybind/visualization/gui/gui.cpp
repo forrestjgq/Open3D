@@ -114,6 +114,24 @@ public:
 
     std::function<void(const LayoutContext &)> on_layout_;
 
+    void ProcessMouseEvent(int x, int y, MouseEvent::Type type, MouseButton btn, int modifiers, bool db_click) {
+        MouseEvent e{};
+        e.type = type;
+        e.modifiers = modifiers;
+        e.x = x;
+        e.y = y;
+        if (type == MouseEvent::MOVE) {
+            e.move.buttons = 0;
+        } else if(type == MouseEvent::DRAG) {
+            e.move.buttons = 1;
+        } else {
+            e.button.button = btn;
+            e.button.count = db_click ? 2 : 1;
+        }
+
+        OnMouseEvent(e);
+    }
+
 protected:
     void Layout(const LayoutContext &context) override {
         if (on_layout_) {
@@ -475,6 +493,9 @@ void pybind_gui_classes(py::module &m) {
                  "closed. The callback is given no arguments and should return "
                  "True to continue closing the window or False to cancel the "
                  "close")
+            .def(
+                    "send_mouse_event", &PyWindow::ProcessMouseEvent,
+                    "send mouse event")
             .def(
                     "set_on_layout",
                     [](PyWindow *w,

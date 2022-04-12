@@ -366,9 +366,11 @@ void BitmapWindowSystem::ResizeRenderer(OSWindow w,
 
 void BitmapWindowSystem::SetMaxRenderFPS(int fps) {
     if (fps <= 0) {
+        utility::LogInfo("disable webrtc render fps limitation");
         impl_->max_redraw_du_ = 0;
     } else {
         impl_->max_redraw_du_ = std::max(10, 1000 / fps);
+        utility::LogInfo("enable webrtc render fps limitation to {}", fps);
     }
 }
 void BitmapWindowSystem::ForceRender(bool render) {
