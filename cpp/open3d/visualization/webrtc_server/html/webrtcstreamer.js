@@ -202,6 +202,28 @@ let WebRtcStreamer = (function() {
             this.dataChannel.send(txt);
         }
     };
+    WebRtcStreamer.prototype.open_connection = function() {
+        var openurl = this.srvurl + '/api/open';
+        var cloudElt = document.getElementById('cloud');
+        var colorElt = document.getElementById('color');
+        var cameraElt = document.getElementById('camera');
+        WebRtcStreamer.remoteCall(
+            openurl, {
+                method: 'POST',
+                body: JSON.stringify({
+                    'identity': this.pc.peerid.toString(),
+                    'args': {
+                        'session': 'editor',
+                        'target': {
+                            'cloud': cloudElt.value,
+                            'color': colorElt.value,
+                            'camera': cameraElt.value,
+                        }
+                    }
+                })
+            }
+        )
+    };
     WebRtcStreamer.prototype.sendJsonRequest = function(cmd, args) {
         console.log('send json request ', cmd, ' params ', args)
         var jsonData = {
@@ -217,6 +239,12 @@ let WebRtcStreamer = (function() {
     WebRtcStreamer.prototype.addEventListeners = function(windowUID) {
         if (this.videoElt) {
             var parentDivElt = this.videoElt.parentElement;
+            var openDivElt = document.createElement('div');
+            openDivElt.style.width = '70%'
+            openDivElt.style.margin = 'auto'
+            openDivElt.style.display = 'flex'
+            openDivElt.style.flexFlow = 'column'
+            openDivElt.style.alignItems = 'center'
             var testDivElt = document.createElement('div');
             testDivElt.style.display = 'flex'
             testDivElt.style.width = '60%'
@@ -226,6 +254,7 @@ let WebRtcStreamer = (function() {
             // TODO: Uncomment this line to display the resize controls.
             // Resize with auto-refresh still need some more work.
             // parentDivElt.insertBefore(controllerDivElt, this.videoElt);
+            parentDivElt.insertBefore(openDivElt, this.videoElt);
             parentDivElt.insertBefore(testDivElt, this.videoElt);
 
             var heightInputElt = document.createElement('input');
@@ -263,28 +292,58 @@ let WebRtcStreamer = (function() {
             };
             controllerDivElt.appendChild(resizeButtonElt);
 
+            var cloudInputElt = document.createElement('input');
+            cloudInputElt.id = 'cloud';
+            cloudInputElt.type = 'text';
+            cloudInputElt.value = '';
+            cloudInputElt.size = 100;
+            cloudInputElt.placeholder = 'cloud path';
+            openDivElt.appendChild(cloudInputElt);
+            var colorInputElt = document.createElement('input');
+            colorInputElt.id = 'color';
+            colorInputElt.type = 'text';
+            colorInputElt.value = '';
+            colorInputElt.size = 100;
+            colorInputElt.placeholder = 'color path, optional';
+            openDivElt.appendChild(colorInputElt);
+            var cameraInputElt = document.createElement('input');
+            cameraInputElt.id = 'camera';
+            cameraInputElt.type = 'text';
+            cameraInputElt.value = '';
+            cameraInputElt.placeholder = 'camera path, optional';
+            cameraInputElt.size = 100;
+            openDivElt.appendChild(cameraInputElt);
+
+            var openButtonElt = document.createElement('button');
+            openButtonElt.id = 'open_button';
+            openButtonElt.type = 'button';
+            openButtonElt.innerText = 'Open';
+            openButtonElt.onclick = () => {
+                this.open_connection()
+            };
+            openDivElt.appendChild(openButtonElt);
             // enter geometry selection
             var geoSelButtonElt = document.createElement('button');
             geoSelButtonElt.id = 'enter_selection_button';
             geoSelButtonElt.type = 'button';
             geoSelButtonElt.innerText = 'Start Geometry Selection';
             geoSelButtonElt.onclick = () => {
-                this.sendJsonRequest('set_selection_state', {'state': 1})
-            };
-            testDivElt.appendChild(geoSelButtonElt);
+            this.sendJsonRequest('set_selection_state', {'state': 1})
+        };
+        testDivElt.appendChild(geoSelButtonElt);
 
-            // select points
-            var selPointsButtonElt = document.createElement('button');
-            selPointsButtonElt.id = 'select_points_button';
-            selPointsButtonElt.type = 'button';
-            selPointsButtonElt.innerText = 'Select Points';
-            selPointsButtonElt.onclick = () => {
-                this.sendJsonRequest('select_points', {})
-            };
-            testDivElt.appendChild(selPointsButtonElt);
+        // select points
+        var selPointsButtonElt = document.createElement('button');
+        selPointsButtonElt.id = 'select_points_button';
+        selPointsButtonElt.type = 'button';
+        selPointsButtonElt.innerText = 'Select Points';
+        selPointsButtonElt.onclick = () => {
+            this.sendJsonRequest('select_points', {})
+        };
+        testDivElt.appendChild(selPointsButtonElt);
 
-            // crop points
-            var cropButtonElt = document.createElement('button');
+        // crop points
+        var cropButtonElt = document.createElement('button');
             cropButtonElt.id = 'crop_button';
             cropButtonElt.type = 'button';
             cropButtonElt.innerText = 'Crop';
@@ -570,25 +629,25 @@ let WebRtcStreamer = (function() {
                                                     })
                                                 }
                                             )
-                                            .then(() => {
-                                                WebRtcStreamer.remoteCall(
-                                                        openurl, {
-                                                            method: 'POST',
-                                                            body: JSON.stringify({
-                                                                'identity': bind.pc.peerid.toString(),
-                                                                'args': {
-                                                                    'session': 'editor',
-                                                                    'target': {
-                                                                        'cloud': '/data/gqjiang/lego/data/different-shooting-angle/standard/009-027-7/009-027-7.tif',
-                                                                        'color': '/data/gqjiang/lego/data/different-shooting-angle/standard/009-027-7/009-027-7.png',
-                                                                        'camera': '/data/gqjiang/lego/data/different-shooting-angle/camera_matrix_JN_02.json',
-                                                                    }
-                                                                }
-                                                            })
-                                                        }
-                                                    )
-                                                }
-                                            )
+                                            // .then(() => {
+                                            //     WebRtcStreamer.remoteCall(
+                                            //             openurl, {
+                                            //                 method: 'POST',
+                                            //                 body: JSON.stringify({
+                                            //                     'identity': bind.pc.peerid.toString(),
+                                            //                     'args': {
+                                            //                         'session': 'editor',
+                                            //                         'target': {
+                                            //                             'cloud': '/data1/gqjiang/lego/data/different-shooting-angle/standard/009-027-7/009-027-7.tif',
+                                            //                             'color': '/data1/gqjiang/lego/data/different-shooting-angle/standard/009-027-7/009-027-7.png',
+                                            //                             'camera': '/data1/gqjiang/lego/data/different-shooting-angle/camera_matrix_JN_02.json',
+                                            //                         }
+                                            //                     }
+                                            //                 })
+                                            //             }
+                                            //         )
+                                            //     }
+                                            // )
                                             .then(() => {
                                                     WebRtcStreamer
                                                         .remoteCall(
