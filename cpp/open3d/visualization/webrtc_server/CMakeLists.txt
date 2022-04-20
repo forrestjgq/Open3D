@@ -1,12 +1,34 @@
 open3d_ispc_add_library(webrtc_server OBJECT)
-
+set(FOUND_NVENC ON)
+if (FOUND_NVENC)
+    add_definitions(-DUSE_NVENC -DUNITY_LINUX)
+    set(nvenc_src
+            NvEncoderImpl.cpp
+            nvenc/NvCodec/codec/NvEncoder.cpp
+            nvenc/NvCodec/codec/NvEncoderGL.cpp
+            nvenc/builtin_video_encoder_factory.cc
+            nvenc/DummyVideoEncoder.cpp
+            nvenc/internal_encoder_factory.cc
+            nvenc/pch.cpp
+            nvenc/UnityVideoEncoderFactory.cpp
+            nvenc/GraphicsDevice/IGraphicsDevice.cpp
+            nvenc/GraphicsDevice/OpenGL/OpenGLTexture2D.cpp
+            nvenc/GraphicsDevice/OpenGL/OpenGLGraphicsDevice.cpp
+            nvenc/GraphicsDevice/Cuda/CudaContext.cpp
+            )
+else()
+    message("NO NVENC")
+    set(nvenc_src)
+endif()
 target_sources(webrtc_server PRIVATE
     BitmapTrackSource.cpp
     HttpServerRequestHandler.cpp
     ImageCapturer.cpp
     PeerConnectionManager.cpp
     WebRTCWindowSystem.cpp
+        ${nvenc_src}
 )
+
 
 target_compile_definitions(webrtc_server PRIVATE
     $<$<PLATFORM_ID:Linux,Darwin>:WEBRTC_POSIX>
@@ -21,7 +43,7 @@ open3d_show_and_abort_on_warning(webrtc_server)
 open3d_set_global_properties(webrtc_server)
 open3d_set_open3d_lib_properties(webrtc_server)
 open3d_link_3rdparty_libraries(webrtc_server)
-
+include_directories(SYSTEM "/data/src/cuda")
 
 if (NOT GUI_RESOURCE_DIR)
     message(FATAL_ERROR "GUI_RESOURCE_DIR is not defined.")

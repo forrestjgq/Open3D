@@ -53,6 +53,13 @@
 #include "open3d/visualization/webrtc_server/ImageCapturer.h"
 #include "open3d/visualization/webrtc_server/VideoFilter.h"
 #include "open3d/visualization/webrtc_server/VideoScaler.h"
+#ifdef USE_NVENC
+#include "open3d/visualization/webrtc_server/nvenc/pch.h"
+#include "open3d/visualization/webrtc_server/nvenc/DummyVideoEncoder.h"
+#include "open3d/visualization/webrtc_server/nvenc/UnityVideoEncoderFactory.h"
+#include "open3d/visualization/webrtc_server/NvEncodeImpl.h"
+#endif
+
 
 namespace open3d {
 namespace visualization {
@@ -72,7 +79,12 @@ struct IceServer {
     std::string user;
     std::string pass;
 };
-
+#ifdef USE_NVENC
+static NvEncoderImpl nvenc_impl_;
+unity::webrtc::IVideoEncoderObserver *GetEncoderObserver() {
+    return static_cast<unity::webrtc::IVideoEncoderObserver *>(&nvenc_impl_);
+}
+#endif
 static IceServer GetIceServerFromUrl(const std::string &url) {
     IceServer srv;
     srv.url = url;
@@ -131,8 +143,13 @@ CreatePeerConnectionFactoryDependencies() {
     media_dependencies.audio_processing =
             webrtc::AudioProcessingBuilder().Create();
 
+#ifdef USE_NVENC
+    media_dependencies.video_encoder_factory =
+            std::make_unique<unity::webrtc::UnityVideoEncoderFactory>(GetEncoderObserver());
+#else
     media_dependencies.video_encoder_factory =
             webrtc::CreateBuiltinVideoEncoderFactory();
+#endif
     media_dependencies.video_decoder_factory =
             webrtc::CreateBuiltinVideoDecoderFactory();
 
