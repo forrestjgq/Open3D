@@ -459,11 +459,11 @@ public:
             }
             if (e.motion.ry != 0 || e.motion.rx != 0) {
                 interactor_->StartMouseDrag();
-                interactor_->Rotate(e.motion.ry, -e.motion.rx);
+                interactor_->Rotate(e.motion.ry, e.motion.rx);
             }
             if (e.motion.rz != 0) {
                 interactor_->StartMouseDrag();
-                interactor_->RotateZ(0, -e.motion.rz);
+                interactor_->RotateZ(0, e.motion.rz);
             }
             if (e.motion.x != 0 || e.motion.z != 0) {
                 interactor_->StartMouseDrag();
@@ -522,11 +522,11 @@ public:
             }
             if (e.motion.ry != 0 || e.motion.rx != 0) {
                 camera_controls_->StartMouseDrag();
-                camera_controls_->Rotate(e.motion.ry, -e.motion.rx);
+                camera_controls_->Rotate(e.motion.ry, e.motion.rx);
             }
             if (e.motion.rz != 0) {
                 camera_controls_->StartMouseDrag();
-                camera_controls_->RotateZ(0, -e.motion.rz);
+                camera_controls_->RotateZ(0, e.motion.rz);
             }
             if (e.motion.x != 0 || e.motion.z != 0) {
                 camera_controls_->StartMouseDrag();

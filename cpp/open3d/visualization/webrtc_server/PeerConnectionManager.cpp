@@ -185,6 +185,35 @@ PeerConnectionManager::PeerConnectionManager(
         return this->GetIceServers();
     };
 
+    func_["/api/login"] = [this](const struct mg_request_info *req_info,
+                                const Json::Value &in) -> Json::Value {
+      utility::LogInfo("[Called HTTP API] /api/login");
+      auto msg = utility::JsonToString(in);
+      auto rsp = WebRTCWindowSystem::GetInstance()->OnHttpMessage("/api/login", msg);
+      return utility::StringToJson(rsp);
+    };
+    func_["/api/logout"] = [this](const struct mg_request_info *req_info,
+                                 const Json::Value &in) -> Json::Value {
+      utility::LogInfo("[Called HTTP API] /api/logout");
+      auto msg = utility::JsonToString(in);
+      auto rsp = WebRTCWindowSystem::GetInstance()->OnHttpMessage("/api/logout", msg);
+      return utility::StringToJson(rsp);
+    };
+    func_["/api/open"] = [this](const struct mg_request_info *req_info,
+                                const Json::Value &in) -> Json::Value {
+      utility::LogInfo("[Called HTTP API] /api/open");
+      auto msg = utility::JsonToString(in);
+      auto rsp = WebRTCWindowSystem::GetInstance()->OnHttpMessage("/api/open", msg);
+      return utility::StringToJson(rsp);
+    };
+    func_["/api/close"] = [this](const struct mg_request_info *req_info,
+                                const Json::Value &in) -> Json::Value {
+      utility::LogInfo("[Called HTTP API] /api/close");
+      auto msg = utility::JsonToString(in);
+      auto rsp = WebRTCWindowSystem::GetInstance()->OnHttpMessage("/api/close", msg);
+      return utility::StringToJson(rsp);
+    };
+
     func_["/api/call"] = [this](const struct mg_request_info *req_info,
                                 const Json::Value &in) -> Json::Value {
         utility::LogInfo("[Called HTTP API] /api/call");
@@ -342,6 +371,19 @@ const Json::Value PeerConnectionManager::Call(const std::string &peerid,
                                               const std::string &options,
                                               const Json::Value &json_message) {
     Json::Value answer;
+    if (!allowed_peerid_.empty()) {
+        if(allowed_peerid_ == "-") {
+            utility::LogWarning("no peer is allowed, a login is required");
+            answer["error"] = "no peer is allowed, a login is required";
+            return answer;
+        }
+        if (allowed_peerid_ != peerid) {
+            utility::LogWarning("peer is not allowed, another one is login");
+            answer["error"] = "peer is not allowed, another one is login";
+            return answer;
+        }
+    }
+
 
     std::string type;
     std::string sdp;

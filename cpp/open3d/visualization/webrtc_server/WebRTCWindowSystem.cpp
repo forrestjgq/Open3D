@@ -103,6 +103,16 @@ static std::string GetEnvWebRTCPort() {
     }
 }
 
+static int GetEnvWebRTCFps() {
+    if (const char *env_p = std::getenv("WEBRTC_FPS")) {
+        return std::stoi(env_p);
+    }
+    return 0;
+}
+
+static std::chrono::high_resolution_clock::time_point now() {
+    return std::chrono::high_resolution_clock::now();
+}
 struct WebRTCWindowSystem::Impl {
     std::unordered_map<WebRTCWindowSystem::OSWindow, std::string>
             os_window_to_uid_;
@@ -115,6 +125,7 @@ struct WebRTCWindowSystem::Impl {
     bool http_handshake_enabled_ = true;
     std::string http_address_;  // Used when http_handshake_enabled_ == true.
     std::string web_root_;      // Used when http_handshake_enabled_ == true.
+    std::string default_peerid_;
 
     // PeerConnectionManager is used for setting up connections and managing API
     // call entry points.
@@ -125,6 +136,14 @@ struct WebRTCWindowSystem::Impl {
 
     std::unordered_map<std::string, std::function<std::string(std::string)>>
             data_channel_message_callbacks_;
+    std::unordered_map<std::string, std::function<std::string(const std::string &, std::string)>>
+            http_message_callbacks_;
+
+    std::chrono::high_resolution_clock::time_point last_mouse_move_ = now();
+    std::chrono::high_resolution_clock::time_point last_mouse_drag_ = now();
+    std::chrono::high_resolution_clock::time_point last_draw_ = now();
+    long total_frame_ = 0;
+    long abandon_frame_ = 0;
 };
 
 std::shared_ptr<WebRTCWindowSystem> WebRTCWindowSystem::GetInstance() {
@@ -154,6 +173,11 @@ WebRTCWindowSystem::WebRTCWindowSystem()
     };
     SetOnWindowDraw(draw_callback);
 
+    auto fps = GetEnvWebRTCFps();
+    if (fps > 0) {
+        SetMaxRenderFPS(fps);
+    }
+
     // Client->server message default callbacks.
     RegisterDataChannelMessageCallback(
             "MouseEvent", [this](const std::string &message) -> std::string {
@@ -164,7 +188,29 @@ WebRTCWindowSystem::WebRTCWindowSystem()
                 if (value.get("class_name", "").asString() == "MouseEvent" &&
                     os_window != nullptr) {
                     gui::MouseEvent me;
-                    if (me.FromJson(value)) PostMouseEvent(os_window, me);
+                    const int ms = 100;
+                    auto ts = now();
+                    if (me.FromJson(value))  {
+                        if (me.type == gui::MouseEvent::MOVE) {
+                            auto span = std::chrono::duration_cast<std::chrono::duration<double>>(ts - impl_->last_mouse_move_);
+                            auto diff = int(span.count()*1000);
+                            if (diff < ms) {
+                                return "";
+                            }
+                            impl_->last_mouse_move_ = ts;
+//                        } else if (me.type == gui::MouseEvent::DRAG) {
+//                            auto span = std::chrono::duration_cast<std::chrono::duration<double>>(ts - impl_->last_mouse_drag_);
+//                            auto diff = int(span.count()*1000);
+//                            if (diff < ms) {
+//                                return "";
+//                            }
+//                            impl_->last_mouse_drag_ = ts;
+//                        } else if (me.type == gui::MouseEvent::BUTTON_DOWN && me.button.count == 2) {
+//                            utility::LogInfo("recv dbl click, button: {}", me.button.button);
+                        }
+                        PostMouseEvent(os_window, me);
+                    }
+
                 }
                 return "";  // empty string is not sent back
             });
@@ -308,6 +354,7 @@ void WebRTCWindowSystem::StartWebRTCServer() {
             impl_->peer_connection_manager_ =
                     std::make_unique<PeerConnectionManager>(
                             ice_servers, config["urls"], ".*", "");
+            impl_->peer_connection_manager_->SetAllowedPeerid(impl_->default_peerid_);
             if (!impl_->peer_connection_manager_->InitializePeerConnection()) {
                 utility::LogError("InitializePeerConnection() failed.");
             }
@@ -332,6 +379,8 @@ void WebRTCWindowSystem::StartWebRTCServer() {
                                                  "*",
                                                  "listening_ports",
                                                  impl_->http_address_,
+                                                 "num_threads",
+                                                 "5",
                                                  "enable_keep_alive",
                                                  "yes",
                                                  "keep_alive_timeout_ms",
@@ -371,6 +420,19 @@ void WebRTCWindowSystem::StartWebRTCServer() {
     }
 }
 
+std::string WebRTCWindowSystem::OnHttpMessage(
+        const std::string &api, const std::string &message) {
+    if (impl_->http_message_callbacks_.count(api) != 0) {
+        std::promise<std::string> promise;
+        auto future = promise.get_future();
+        PostCallableEvent([&]{
+            auto rsp = impl_->http_message_callbacks_.at(api)(api, message);
+            promise.set_value(rsp);
+        });
+        return future.get();
+    }
+    return R"({"error": "unknown api"})";
+}
 std::string WebRTCWindowSystem::OnDataChannelMessage(
         const std::string &message) {
     utility::LogDebug("WebRTCWindowSystem::OnDataChannelMessage: {}", message);
@@ -381,11 +443,42 @@ std::string WebRTCWindowSystem::OnDataChannelMessage(
         const std::string window_uid = value.get("window_uid", "").asString();
 
         if (impl_->data_channel_message_callbacks_.count(class_name) != 0) {
-            reply = impl_->data_channel_message_callbacks_.at(class_name)(
-                    message);
+#if 1
+            if (class_name == "webapp") {
+                const bool sync = value.get("sync", false).asBool();
+                if (sync) {
+                    // forward webapp message to main thread and wait response
+                    // to make sure when response is sent, it finishes
+                    std::promise<std::string> promise;
+                    auto future = promise.get_future();
+                    PostCallableEvent([&] {
+                      auto rsp = impl_->data_channel_message_callbacks_.at(class_name)(
+                              message);
+                      promise.set_value(rsp);
+                    });
+                    reply = future.get();
+                } else {
+                    // msg must be copied for async process otherwise memory
+                    // might be corrupted
+                    PostCallableEvent([=] {
+                     impl_->data_channel_message_callbacks_.at(class_name)(
+                              message);
+                    });
+                }
+            } else {
+                // this is Open3D message, async is already implemented, so
+                // post execution is not required
+                reply = impl_->data_channel_message_callbacks_.at(class_name)(message);
+            }
             const auto os_window = GetOSWindowByUID(window_uid);
             if (os_window) PostRedrawEvent(os_window);
             return reply;
+#else
+            PostCallableEvent([&] {
+              auto rsp = impl_->data_channel_message_callbacks_.at(class_name)(
+                      message);
+            });
+#endif
         } else {
             reply = fmt::format(
                     "OnDataChannelMessage: {}. Message cannot be parsed, as "
@@ -407,6 +500,11 @@ std::string WebRTCWindowSystem::OnDataChannelMessage(
            reply;  // Add tag for detecting error in client
 }
 
+void WebRTCWindowSystem::RegisterHttpMessageCallback(
+        const std::string &api,
+        const std::function<std::string(const std::string &, const std::string &)> callback) {
+    impl_->http_message_callbacks_[api] = callback;
+}
 void WebRTCWindowSystem::RegisterDataChannelMessageCallback(
         const std::string &class_name,
         const std::function<std::string(const std::string &)> callback) {
@@ -421,18 +519,31 @@ void WebRTCWindowSystem::OnFrame(const std::string &window_uid,
     impl_->peer_connection_manager_->OnFrame(window_uid, im);
 }
 
+void WebRTCWindowSystem::SendMessage(const std::string &peerid, const std::string &msg) {
+    if (impl_->peer_connection_manager_) {
+        impl_->peer_connection_manager_->SendMessage(peerid, msg);
+    }
+}
+void WebRTCWindowSystem::SetAllowedPeerid(const std::string &peerid) {
+    impl_->default_peerid_ = peerid;
+    if (impl_->peer_connection_manager_) {
+        impl_->peer_connection_manager_->SetAllowedPeerid(peerid);
+    }
+}
 void WebRTCWindowSystem::SendInitFrames(const std::string &window_uid) {
     utility::LogInfo("Sending init frames to {}.", window_uid);
     static const int s_max_initial_frames = 5;
     static const int s_sleep_between_frames_ms = 100;
     const auto os_window = GetOSWindowByUID(window_uid);
     if (!os_window) return;
+    PostCallableEvent([this]() { ForceRender(true); });
     for (int i = 0; os_window != nullptr && i < s_max_initial_frames; ++i) {
         PostRedrawEvent(os_window);
         std::this_thread::sleep_for(
                 std::chrono::milliseconds(s_sleep_between_frames_ms));
         utility::LogDebug("Sent init frames #{} to {}.", i, window_uid);
     }
+    PostCallableEvent([this]() { ForceRender(false); });
 }
 
 std::string WebRTCWindowSystem::CallHttpAPI(const std::string &entry_point,

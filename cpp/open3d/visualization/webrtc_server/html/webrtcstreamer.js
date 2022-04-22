@@ -32,7 +32,7 @@
 // ----------------------------------------------------------------------------
 
 (function() {
-const enableLogging = false;
+const enableLogging = true;
 if (enableLogging === false) {
     if (typeof window.console === 'undefined') {
         window.console = {};
@@ -197,18 +197,65 @@ let WebRtcStreamer = (function() {
     // implement features such as synchronized updates over multiple windows.
     WebRtcStreamer.prototype.sendJsonData = function(jsonData) {
         if (typeof this.dataChannel != 'undefined') {
-            this.dataChannel.send(JSON.stringify(jsonData));
+            var txt = JSON.stringify(jsonData);
+            // console.log('send message ', txt)
+            this.dataChannel.send(txt);
         }
+    };
+    WebRtcStreamer.prototype.open_connection = function() {
+        var openurl = this.srvurl + '/api/open';
+        var cloudElt = document.getElementById('cloud');
+        var colorElt = document.getElementById('color');
+        var cameraElt = document.getElementById('camera');
+        WebRtcStreamer.remoteCall(
+            openurl, {
+                method: 'POST',
+                body: JSON.stringify({
+                    'identity': this.pc.peerid.toString(),
+                    'args': {
+                        'session': 'editor',
+                        'target': {
+                            'cloud': cloudElt.value,
+                            'color': colorElt.value,
+                            'camera': cameraElt.value,
+                        }
+                    }
+                })
+            }
+        )
+    };
+    WebRtcStreamer.prototype.sendJsonRequest = function(cmd, args) {
+        console.log('send json request ', cmd, ' params ', args)
+        var jsonData = {
+            'class_name': "webapp",
+            'receiver': 'editor',
+            'identity': this.pc.peerid.toString(),
+            'cmd': cmd,
+            'args': args,
+        };
+        this.sendJsonData(jsonData);
     };
 
     WebRtcStreamer.prototype.addEventListeners = function(windowUID) {
         if (this.videoElt) {
             var parentDivElt = this.videoElt.parentElement;
+            var openDivElt = document.createElement('div');
+            openDivElt.style.width = '70%'
+            openDivElt.style.margin = 'auto'
+            openDivElt.style.display = 'flex'
+            openDivElt.style.flexFlow = 'column'
+            openDivElt.style.alignItems = 'center'
+            var testDivElt = document.createElement('div');
+            testDivElt.style.display = 'flex'
+            testDivElt.style.width = '60%'
+            testDivElt.style.margin = 'auto'
             var controllerDivElt = document.createElement('div');
 
             // TODO: Uncomment this line to display the resize controls.
             // Resize with auto-refresh still need some more work.
             // parentDivElt.insertBefore(controllerDivElt, this.videoElt);
+            parentDivElt.insertBefore(openDivElt, this.videoElt);
+            parentDivElt.insertBefore(testDivElt, this.videoElt);
 
             var heightInputElt = document.createElement('input');
             heightInputElt.id = windowUID + '_height_input';
@@ -244,6 +291,76 @@ let WebRtcStreamer = (function() {
                 this.sendJsonData(resizeEvent);
             };
             controllerDivElt.appendChild(resizeButtonElt);
+
+            var cloudInputElt = document.createElement('input');
+            cloudInputElt.id = 'cloud';
+            cloudInputElt.type = 'text';
+            cloudInputElt.value = '';
+            cloudInputElt.size = 100;
+            cloudInputElt.placeholder = 'cloud path';
+            openDivElt.appendChild(cloudInputElt);
+            var colorInputElt = document.createElement('input');
+            colorInputElt.id = 'color';
+            colorInputElt.type = 'text';
+            colorInputElt.value = '';
+            colorInputElt.size = 100;
+            colorInputElt.placeholder = 'color path, optional';
+            openDivElt.appendChild(colorInputElt);
+            var cameraInputElt = document.createElement('input');
+            cameraInputElt.id = 'camera';
+            cameraInputElt.type = 'text';
+            cameraInputElt.value = '';
+            cameraInputElt.placeholder = 'camera path, optional';
+            cameraInputElt.size = 100;
+            openDivElt.appendChild(cameraInputElt);
+
+            var openButtonElt = document.createElement('button');
+            openButtonElt.id = 'open_button';
+            openButtonElt.type = 'button';
+            openButtonElt.innerText = 'Open';
+            openButtonElt.onclick = () => {
+                this.open_connection()
+            };
+            openDivElt.appendChild(openButtonElt);
+            // enter geometry selection
+            var geoSelButtonElt = document.createElement('button');
+            geoSelButtonElt.id = 'enter_selection_button';
+            geoSelButtonElt.type = 'button';
+            geoSelButtonElt.innerText = 'Start Geometry Selection';
+            geoSelButtonElt.onclick = () => {
+            this.sendJsonRequest('set_selection_state', {'state': 1})
+        };
+        testDivElt.appendChild(geoSelButtonElt);
+
+        // select points
+        var selPointsButtonElt = document.createElement('button');
+        selPointsButtonElt.id = 'select_points_button';
+        selPointsButtonElt.type = 'button';
+        selPointsButtonElt.innerText = 'Select Points';
+        selPointsButtonElt.onclick = () => {
+            this.sendJsonRequest('select_points', {})
+        };
+        testDivElt.appendChild(selPointsButtonElt);
+
+        // crop points
+        var cropButtonElt = document.createElement('button');
+            cropButtonElt.id = 'crop_button';
+            cropButtonElt.type = 'button';
+            cropButtonElt.innerText = 'Crop';
+            cropButtonElt.onclick = () => {
+                this.sendJsonRequest('crop_selection', {})
+            };
+            testDivElt.appendChild(cropButtonElt);
+
+            // delete points
+            var deleteButtonElt = document.createElement('button');
+            deleteButtonElt.id = 'delete_button';
+            deleteButtonElt.type = 'button';
+            deleteButtonElt.innerText = 'Delete';
+            deleteButtonElt.onclick = () => {
+                this.sendJsonRequest('delete_selection', {})
+            };
+            testDivElt.appendChild(deleteButtonElt);
 
             var o3dmouseButtons = ['LEFT', 'MIDDLE', 'RIGHT'];
 
@@ -470,6 +587,8 @@ let WebRtcStreamer = (function() {
         try {
             this.createPeerConnection();
 
+            var loginurl = this.srvurl + '/api/login';
+            var openurl = this.srvurl + '/api/open';
             var callurl = this.srvurl + '/api/call?peerid=' + this.pc.peerid +
                     '&url=' + encodeURIComponent(videourl);
             if (audiourl) {
@@ -496,35 +615,72 @@ let WebRtcStreamer = (function() {
                                         JSON.stringify(sessionDescription));
 
                                 bind.pc.setLocalDescription(
-                                        sessionDescription,
-                                        function() {
-                                            WebRtcStreamer
-                                                    .remoteCall(
+                                    sessionDescription,
+                                    function() {
+                                        WebRtcStreamer
+                                            .remoteCall(
+                                                loginurl, {
+                                                    method: 'POST',
+                                                    body: JSON.stringify({
+                                                        'identity': bind.pc.peerid.toString(),
+                                                        'args': {
+                                                            'force': true
+                                                        }
+                                                    })
+                                                }
+                                            )
+                                            // .then(() => {
+                                            //     WebRtcStreamer.remoteCall(
+                                            //             openurl, {
+                                            //                 method: 'POST',
+                                            //                 body: JSON.stringify({
+                                            //                     'identity': bind.pc.peerid.toString(),
+                                            //                     'args': {
+                                            //                         'session': 'editor',
+                                            //                         'target': {
+                                            //                             'cloud': '/data1/gqjiang/lego/data/different-shooting-angle/standard/009-027-7/009-027-7.tif',
+                                            //                             'color': '/data1/gqjiang/lego/data/different-shooting-angle/standard/009-027-7/009-027-7.png',
+                                            //                             'camera': '/data1/gqjiang/lego/data/different-shooting-angle/camera_matrix_JN_02.json',
+                                            //                         }
+                                            //                     }
+                                            //                 })
+                                            //             }
+                                            //         )
+                                            //     }
+                                            // )
+                                            .then(() => {
+                                                    WebRtcStreamer
+                                                        .remoteCall(
                                                             callurl, {
                                                                 method: 'POST',
                                                                 body: JSON.stringify(
-                                                                        sessionDescription),
+                                                                    sessionDescription),
                                                             },
                                                             bind.commsFetch)
-                                                    .then(bind._handleHttpErrors)
-                                                    .then((response) =>
-                                                                  response.json())
-                                                    .catch((error) => bind.onError(
-                                                                   'call ' +
-                                                                   error))
-                                                    .then((response) =>
-                                                                  bind.onReceiveCall
-                                                                          .call(bind,
-                                                                                response))
-                                                    .catch((error) => bind.onError(
-                                                                   'call ' +
-                                                                   error));
-                                        },
-                                        function(error) {
-                                            console.warn(
-                                                    'setLocalDescription error:' +
-                                                    JSON.stringify(error));
-                                        });
+                                                        .then(bind._handleHttpErrors)
+                                                        .then((response) =>
+                                                            response.json())
+                                                        .catch((error) => bind.onError(
+                                                            'call ' +
+                                                            error))
+                                                        .then((response) =>
+                                                            bind.onReceiveCall
+                                                                .call(bind,
+                                                                    response))
+                                                        .catch((error) => bind.onError(
+                                                            'call ' +
+                                                            error));
+                                                }
+                                            )
+                                            .catch((error) => bind.onError(
+                                                'call ' + error
+                                            ));
+                                    },
+                                    function(error) {
+                                        console.warn(
+                                            'setLocalDescription error:' +
+                                            JSON.stringify(error));
+                                    });
                             },
                             function(error) {
                                 alert('Create offer error:' +
@@ -628,6 +784,7 @@ let WebRtcStreamer = (function() {
                 bind.videoElt.dispatchEvent(new CustomEvent(
                         'LocalDataChannelOpen',
                         {detail: {channel: dataChannel}}));
+
             };
             dataChannel.onmessage = function(evt) {
                 console.log(

@@ -57,22 +57,32 @@ struct BitmapWindow {
 struct BitmapEvent {
     BitmapWindow *event_target;
 
-    BitmapEvent(BitmapWindow *target) : event_target(target) {}
+    explicit BitmapEvent(BitmapWindow *target) : event_target(target) {}
     virtual ~BitmapEvent() {}
 
     virtual void Execute() = 0;
 };
 
 struct BitmapDrawEvent : public BitmapEvent {
-    BitmapDrawEvent(BitmapWindow *target) : BitmapEvent(target) {}
+    explicit BitmapDrawEvent(BitmapWindow *target) : BitmapEvent(target) {}
 
     void Execute() override { event_target->o3d_window->OnDraw(); }
 };
 
 struct BitmapResizeEvent : public BitmapEvent {
-    BitmapResizeEvent(BitmapWindow *target) : BitmapEvent(target) {}
+    explicit BitmapResizeEvent(BitmapWindow *target) : BitmapEvent(target) {}
 
     void Execute() override { event_target->o3d_window->OnResize(); }
+};
+
+struct BitmapCallableEvent : public BitmapEvent {
+    std::function<void()> callable;
+    explicit BitmapCallableEvent(std::function<void()> todo)
+        : BitmapEvent(nullptr), callable(todo) {}
+
+    void Execute() override {
+        if (callable) callable();
+    }
 };
 
 struct BitmapMouseEvent : public BitmapEvent {
@@ -142,10 +152,23 @@ private:
 
 }  // namespace
 
+static std::chrono::high_resolution_clock::time_point now() {
+    return std::chrono::high_resolution_clock::now();
+}
+/// calc duration from s to e
+static int duration(const std::chrono::high_resolution_clock::time_point &e,
+                    const std::chrono::high_resolution_clock::time_point &s) {
+    auto du = e - s;
+    auto span = std::chrono::duration_cast<std::chrono::duration<double>>(du);
+    return int(span.count() * 1000);
+}
 struct BitmapWindowSystem::Impl {
     BitmapWindowSystem::OnDrawCallback on_draw_;
     BitmapEventQueue event_queue_;
     bool rgba_ = false;
+    int max_redraw_du_ = 0;
+    int force_draw_requested_ = 0;
+    std::chrono::high_resolution_clock::time_point last_draw_ = now();
 };
 
 BitmapWindowSystem::BitmapWindowSystem(Rendering mode /*= Rendering::NORMAL*/,
@@ -220,6 +243,10 @@ void BitmapWindowSystem::DestroyWindow(OSWindow w) {
     }
     // Requiem aeternam dona ei. Requiscat in pace.
     delete (BitmapWindow *)w;
+}
+
+void BitmapWindowSystem::PostCallableEvent(std::function<void()> todo) {
+    impl_->event_queue_.push(std::make_shared<BitmapCallableEvent>(todo));
 }
 
 void BitmapWindowSystem::PostRedrawEvent(OSWindow w) {
@@ -311,6 +338,15 @@ rendering::FilamentRenderer *BitmapWindowSystem::CreateRenderer(OSWindow w) {
             return;
         }
 
+        if (impl_->max_redraw_du_ > 0) {
+            auto end = now();
+            if (impl_->force_draw_requested_ == 0 &&
+                duration(end, impl_->last_draw_) < impl_->max_redraw_du_) {
+                return;
+            }
+            impl_->last_draw_ = end;
+        }
+
         auto size = this->GetWindowSizePixels(w);
         Window *window = ((BitmapWindow *)w)->o3d_window;
 
@@ -335,6 +371,22 @@ void BitmapWindowSystem::ResizeRenderer(OSWindow w,
     renderer->UpdateBitmapSwapChain(size.width, size.height);
 }
 
+void BitmapWindowSystem::SetMaxRenderFPS(int fps) {
+    if (fps <= 0) {
+        utility::LogInfo("disable webrtc render fps limitation");
+        impl_->max_redraw_du_ = 0;
+    } else {
+        impl_->max_redraw_du_ = std::max(10, 1000 / fps);
+        utility::LogInfo("enable webrtc render fps limitation to {}", fps);
+    }
+}
+void BitmapWindowSystem::ForceRender(bool render) {
+    if (render) {
+        impl_->force_draw_requested_++;
+    } else {
+        impl_->force_draw_requested_--;
+    }
+}
 MenuBase *BitmapWindowSystem::CreateOSMenu() { return new MenuImgui(); }
 
 }  // namespace gui
