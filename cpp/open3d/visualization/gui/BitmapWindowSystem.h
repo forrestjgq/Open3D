@@ -51,7 +51,7 @@ public:
         HEADLESS  // uses EGL, does not require the OS to have a window system.
                   // (Linux only)
     };
-    BitmapWindowSystem(Rendering mode = Rendering::NORMAL);
+    BitmapWindowSystem(Rendering mode = Rendering::NORMAL, bool rgba=false);
     ~BitmapWindowSystem();
 
     void Initialize() override;

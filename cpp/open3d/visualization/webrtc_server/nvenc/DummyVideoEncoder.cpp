@@ -1,7 +1,8 @@
 #include "pch.h"
 #include "DummyVideoEncoder.h"
 #include "modules/video_coding/utility/simulcast_rate_allocator.h"
-
+#include <iostream>
+#include "open3d/utility/Logging.h"
 namespace unity
 {
 namespace webrtc

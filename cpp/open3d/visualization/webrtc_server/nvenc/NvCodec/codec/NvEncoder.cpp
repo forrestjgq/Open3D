@@ -1,10 +1,15 @@
+
+#include <GL/glew.h>
+#include <GL/glut.h>
+#include <GL/freeglut_ext.h>
 #include "open3d/visualization/webrtc_server/nvenc/pch.h"
 #include "NvEncoder.h"
 #include <cstring>
 #include "open3d/visualization/webrtc_server/nvenc/GraphicsDevice/IGraphicsDevice.h"
 #include "open3d/visualization/webrtc_server/nvenc/GraphicsDevice/ITexture2D.h"
 #include "open3d/visualization/webrtc_server/nvenc/DummyVideoEncoder.h"
-
+#include "open3d/utility/Logging.h"
+#include <iostream>
 #if _WIN32
 #else
 #include <dlfcn.h>
@@ -39,6 +44,29 @@ namespace webrtc
 
     void NvEncoder::InitV()
     {
+        int argc = 1;
+
+        char *argv[] = {strdup("hello")};
+        glutInit(&argc, argv);
+        glutInitDisplayMode(GLUT_RGBA | GLUT_SINGLE);
+        glutInitWindowSize(800, 480);
+        int window = glutCreateWindow("AppEncGL");
+        if (!window)
+        {
+            std::cout << "Unable to create GLUT window." << std::endl;
+            return;
+        }
+        glutHideWindow();
+#if _DEBUG
+        GLuint unusedIds = 0;
+        glEnable(GL_DEBUG_OUTPUT);
+        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+#if SUPPORT_OPENGL_CORE
+        glDebugMessageCallback(OnOpenGLDebugMessage, nullptr);
+        glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, &unusedIds, true);
+#endif
+#endif
+        m_window = window;
         bool result = true;
         if (m_initializationResult == CodecInitializationResult::NotInitialized)
         {
@@ -75,6 +103,7 @@ namespace webrtc
         nvEncInitializeParams.darHeight = m_height;
         nvEncInitializeParams.encodeGUID = NV_ENC_CODEC_H264_GUID;
 
+        open3d::utility::LogInfo("init encoder w {} h {}", m_width, m_height);
 // todo(kazuki):: fix workaround
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
@@ -141,6 +170,7 @@ namespace webrtc
             checkf(NV_RESULT(errorCode), "Failed to destroy NV encoder interface");
             pEncoderInterface = nullptr;
         }
+        if (m_window) glutDestroyWindow(m_window);
     }
 
     CodecInitializationResult NvEncoder::LoadCodec()
@@ -272,7 +302,14 @@ namespace webrtc
         isIdrFrame = true;
     }
 
-    bool NvEncoder::CopyBuffer(void* frame)
+void NvEncoder::MakeContextCurrent() {
+    if (m_window) {
+        if (m_window != glutGetWindow()) {
+            glutSetWindow(m_window);
+        }
+    }
+}
+bool NvEncoder::CopyBuffer(void* frame)
     {
         const int curFrameNum = GetCurrentFrameCount() % bufferedFrameNum;
         const auto tex = m_renderTextures[curFrameNum];
@@ -280,6 +317,20 @@ namespace webrtc
             return false;
         m_device->CopyResourceFromNativeV(tex, frame);
         return true;
+    }
+    bool NvEncoder::CopyBufferFromCPU(void* frame)
+    {
+        const int curFrameNum = GetCurrentFrameCount() % bufferedFrameNum;
+        const auto tex = m_renderTextures[curFrameNum];
+        if (tex == nullptr)
+            return false;
+#if 0
+        auto idx = (GetCurrentFrameCount()+1) % bufferedFrameNum;
+        auto ptr = (void *)(long)m_renderTextures[idx];
+        return m_device->CopyResourceFromNativeV(tex, ptr);
+#else
+        return m_device->CopyResourceFromCPU(tex, frame);
+#endif
     }
 
     //entry for encoding a frame

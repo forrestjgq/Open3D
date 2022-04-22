@@ -139,7 +139,7 @@ WebRTCWindowSystem::WebRTCWindowSystem()
 #else
               BitmapWindowSystem::Rendering::NORMAL
 #endif
-              ),
+              ,false),
       impl_(new WebRTCWindowSystem::Impl()) {
 
     // impl_->web_root_ is filled at StartWebRTCServer. It relies on

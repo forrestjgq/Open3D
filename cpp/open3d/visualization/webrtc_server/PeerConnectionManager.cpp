@@ -80,9 +80,8 @@ struct IceServer {
     std::string pass;
 };
 #ifdef USE_NVENC
-static NvEncoderImpl nvenc_impl_;
 unity::webrtc::IVideoEncoderObserver *GetEncoderObserver() {
-    return static_cast<unity::webrtc::IVideoEncoderObserver *>(&nvenc_impl_);
+    return NvEncoderImpl::GetInstance();
 }
 #endif
 static IceServer GetIceServerFromUrl(const std::string &url) {

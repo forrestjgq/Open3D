@@ -33,19 +33,33 @@
 #include <media/base/video_common.h>
 
 #include <memory>
+#include "open3d/visualization/webrtc_server/WebRTCWindowSystem.h"
 
 #include "open3d/core/Tensor.h"
 #include "open3d/utility/Logging.h"
-
+#ifdef USE_NVENC
+#include "open3d/visualization/webrtc_server/nvenc/pch.h"
+#include "open3d/visualization/webrtc_server/nvenc/DummyVideoEncoder.h"
+#include "open3d/visualization/webrtc_server/NvEncodeImpl.h"
+#include "open3d/visualization/webrtc_server/nvenc/IEncoder.h"
+#endif
 namespace open3d {
 namespace visualization {
 namespace webrtc_server {
 
 ImageCapturer::ImageCapturer(const std::string& url_,
                              const std::map<std::string, std::string>& opts)
-    : ImageCapturer(opts) {}
+    : ImageCapturer(opts) {
+}
 
-ImageCapturer::~ImageCapturer() {}
+ImageCapturer::~ImageCapturer() {
+#ifdef USE_NVENC
+    if (impl_id_) {
+        NvEncoderImpl::GetInstance()->RemoveEncoder(impl_id_);
+        impl_id_ = 0;
+    }
+#endif
+}
 
 ImageCapturer* ImageCapturer::Create(
         const std::string& url,
@@ -64,6 +78,34 @@ ImageCapturer::ImageCapturer(const std::map<std::string, std::string>& opts)
     }
 }
 
+#ifdef USE_NVENC
+void ImageCapturer::OnCaptureResult(
+        const std::shared_ptr<core::Tensor>& frame) {
+    auto impl = NvEncoderImpl::GetInstance();
+    if (impl_id_ == 0) {
+        auto wids = WebRTCWindowSystem::GetInstance()->GetWindowUIDs();
+        int width = 0;
+        int height = 0;
+        if (wids.size() == 1) {
+            auto w = WebRTCWindowSystem::GetInstance()->GetOSWindowByUID(wids[0]);
+            auto sz = WebRTCWindowSystem::GetInstance()->GetWindowSize(w);
+            width = sz.width;
+            height = sz.height;
+        }
+
+        auto encoder = NvEncoderImpl::GetInstance()->AddEncoder(width, height);
+        encoder->CaptureFrame.connect(this, &ImageCapturer::DelegateFrame);
+        impl_id_ = encoder->Id();
+        NvEncoderImpl::GetInstance()->SaveEncoder(encoder);
+
+    }
+    impl->EncodeFrame(impl_id_, frame->GetDataPtr());
+}
+void ImageCapturer::DelegateFrame(const webrtc::VideoFrame &frame) {
+    broadcaster_.OnFrame(frame);
+}
+
+#else
 void ImageCapturer::OnCaptureResult(
         const std::shared_ptr<core::Tensor>& frame) {
     int height = (int)frame->GetShape(0);
@@ -111,6 +153,7 @@ void ImageCapturer::OnCaptureResult(
                           conversion_result);
     }
 }
+#endif
 
 // Overide rtc::VideoSourceInterface<webrtc::VideoFrame>.
 void ImageCapturer::AddOrUpdateSink(

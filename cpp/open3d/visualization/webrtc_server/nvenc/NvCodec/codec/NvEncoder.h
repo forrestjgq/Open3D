@@ -50,7 +50,9 @@ namespace webrtc
         void InitV() override;
         void SetRates(uint32_t bitRate, int64_t frameRate) override;
         void UpdateSettings() override;
+        void MakeContextCurrent() override;
         bool CopyBuffer(void* frame) override;
+        bool CopyBufferFromCPU(void* frame) override;
         bool EncodeFrame(int64_t timestamp_us) override;
         bool IsSupported() const override { return m_isNvEncoderSupported; }
         void SetIdrFrame()  override { isIdrFrame = true; }
@@ -94,6 +96,7 @@ namespace webrtc
         uint32_t m_frameRate = 30;
         uint32_t m_targetBitrate = 0;
         rtc::TimestampAligner timestamp_aligner_;
+        int m_window = 0;
     };
     
 } // end namespace webrtc

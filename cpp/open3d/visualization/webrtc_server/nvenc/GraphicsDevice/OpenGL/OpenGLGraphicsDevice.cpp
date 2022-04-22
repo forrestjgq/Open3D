@@ -4,7 +4,7 @@
 #include "OpenGLGraphicsDevice.h"
 #include "OpenGLTexture2D.h"
 #include "open3d/visualization/webrtc_server/nvenc/GraphicsDevice/GraphicsUtility.h"
-
+#include <iostream>
 namespace unity
 {
 namespace webrtc
@@ -70,6 +70,17 @@ ITexture2D* OpenGLGraphicsDevice::CreateDefaultTextureV(
     glBindTexture(GL_TEXTURE_2D, 0);
     return new OpenGLTexture2D(w, h, tex);
 }
+ITexture2D* OpenGLGraphicsDevice::CreateDefaultTextureVFromCPU(
+        uint32_t w, uint32_t h, UnityRenderingExtTextureFormat textureFormat, void *data)
+{
+    GLuint tex;
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, w, h);
+    glTexImage2D(GL_TEXTURE_2D, 1, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    return new OpenGLTexture2D(w, h, tex);
+}
 
 //---------------------------------------------------------------------------------------------------------------------
 ITexture2D* OpenGLGraphicsDevice::CreateCPUReadTextureV(
@@ -97,6 +108,57 @@ bool OpenGLGraphicsDevice::CopyResourceFromNativeV(ITexture2D* dest, void* nativ
     const GLuint srcName = reinterpret_cast<uintptr_t>(nativeTexturePtr);
     return CopyResource(dstName, srcName, width, height);
 }
+#define CHECK_ERR() do { \
+    auto err = glGetError(); \
+    if (err != 0) {   \
+            std::cout << __FILE__ << ":" << __LINE__ << ": opengl error " << err << std::endl; \
+}\
+    } while(0)
+#if 1
+bool OpenGLGraphicsDevice::CopyResourceFromCPU(ITexture2D* dest, void* nativeTexturePtr) {
+    const uint32_t width = dest->GetWidth();
+    const uint32_t height  = dest->GetHeight();
+    const GLuint dstName = reinterpret_cast<uintptr_t>(dest->GetNativeTexturePtrV());
+    if(glIsTexture(dstName) == GL_FALSE) {
+        RTC_LOG(LS_INFO) << "dstName is not texture";
+        return false;
+    }
+    glBindTexture(GL_TEXTURE_2D, dstName);
+    CHECK_ERR();
+    //glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, width, height);
+    //CHECK_ERR();
+//    glTexImage2D(GL_TEXTURE_2D, 1, GL_RGBA, int(width), int(height), 0, GL_RGBA, GL_UNSIGNED_BYTE, nativeTexturePtr);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
+                    width, height,
+                    GL_RGB, GL_UNSIGNED_BYTE, nativeTexturePtr);
+    CHECK_ERR();
+    glBindTexture(GL_TEXTURE_2D, 0);
+    CHECK_ERR();
+    return true;
+}
+#else
+
+bool OpenGLGraphicsDevice::CopyResourceFromCPU(ITexture2D* dest, void* nativeTexturePtr) {
+    const uint32_t width = dest->GetWidth();
+    const uint32_t height  = dest->GetHeight();
+    GLuint tex;
+    CHECK_ERR();
+    glGenTextures(1, &tex);
+    CHECK_ERR();
+    glBindTexture(GL_TEXTURE_2D, tex);
+    CHECK_ERR();
+    glTexImage2D(GL_TEXTURE_2D, 1, GL_RGBA, int(width), int(height), 0, GL_RGBA, GL_UNSIGNED_BYTE, nativeTexturePtr);
+    CHECK_ERR();
+    glBindTexture(GL_TEXTURE_2D, 0);
+    CHECK_ERR();
+    const GLuint dstName = reinterpret_cast<uintptr_t>(dest->GetNativeTexturePtrV());
+    auto b = CopyResource(dstName, tex, width, height);
+    CHECK_ERR();
+    glDeleteTextures(1, &tex);
+    CHECK_ERR();
+    return b;
+}
+#endif
 
 bool OpenGLGraphicsDevice::CopyResource(GLuint dstName, GLuint srcName, uint32 width, uint32 height) {
     if(srcName == dstName)
@@ -122,6 +184,7 @@ bool OpenGLGraphicsDevice::CopyResource(GLuint dstName, GLuint srcName, uint32 w
         srcName, GL_TEXTURE_2D, 0, 0, 0, 0,
         dstName, GL_TEXTURE_2D, 0, 0, 0, 0,
         width, height, 1);
+    CHECK_ERR();
 // #elif SUPPORT_OPENGL_ES
 //     glBindTexture(GL_TEXTURE_2D, srcName);
 //     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo[1]);

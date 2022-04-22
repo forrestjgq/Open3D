@@ -145,10 +145,13 @@ private:
 struct BitmapWindowSystem::Impl {
     BitmapWindowSystem::OnDrawCallback on_draw_;
     BitmapEventQueue event_queue_;
+    bool rgba_ = false;
 };
 
-BitmapWindowSystem::BitmapWindowSystem(Rendering mode /*= Rendering::NORMAL*/)
+BitmapWindowSystem::BitmapWindowSystem(Rendering mode /*= Rendering::NORMAL*/,
+                                       bool rgba /*= false*/)
     : impl_(new BitmapWindowSystem::Impl()) {
+    impl_->rgba_ = rgba;
     if (mode == Rendering::HEADLESS) {
 #if !defined(__APPLE__) && !defined(_WIN32) && !defined(_WIN64)
         rendering::EngineInstance::EnableHeadless();
@@ -316,7 +319,11 @@ rendering::FilamentRenderer *BitmapWindowSystem::CreateRenderer(OSWindow w) {
                 this->impl_->on_draw_(window, image);
             }
         };
-        renderer->RequestReadPixels(size.width, size.height, on_pixels);
+        if(impl_->rgba_) {
+            renderer->RequestReadRGBAPixels(size.width, size.height, on_pixels);
+        } else {
+            renderer->RequestReadPixels(size.width, size.height, on_pixels);
+        }
     };
     renderer->SetOnAfterDraw(on_after_draw);
     return renderer;

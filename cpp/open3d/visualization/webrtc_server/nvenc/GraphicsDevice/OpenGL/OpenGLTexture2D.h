@@ -24,8 +24,8 @@ public:
     byte* GetBuffer() const { return m_buffer;  }
     GLuint GetPBO() const { return m_pbo; }
 private:
-    GLuint m_texture;
-    GLuint m_pbo;
+    GLuint m_texture = 0;
+    GLuint m_pbo = 0;
     byte* m_buffer = nullptr;
 };
 

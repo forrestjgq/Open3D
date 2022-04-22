@@ -63,6 +63,7 @@ namespace webrtc
             m_encoderId(encoderId),
             m_buffer(data)
         {}
+        ~FrameBuffer() override = default;
 
         //webrtc::VideoFrameBuffer pure virtual functions
         // This function specifies in what pixel format the data is stored in.

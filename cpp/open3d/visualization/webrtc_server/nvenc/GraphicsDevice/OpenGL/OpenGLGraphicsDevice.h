@@ -25,9 +25,11 @@ public:
 
     virtual ITexture2D* CreateDefaultTextureV(uint32_t w, uint32_t h, UnityRenderingExtTextureFormat textureFormat) override;
     virtual ITexture2D* CreateCPUReadTextureV(uint32_t width, uint32_t height, UnityRenderingExtTextureFormat textureFormat) override;
+    ITexture2D* CreateDefaultTextureVFromCPU(uint32_t w, uint32_t h, UnityRenderingExtTextureFormat textureFormat, void *data);
     virtual bool CopyResourceV(ITexture2D* dest, ITexture2D* src) override;
     virtual rtc::scoped_refptr<webrtc::I420Buffer> ConvertRGBToI420(ITexture2D* tex) override;
     virtual bool CopyResourceFromNativeV(ITexture2D* dest, void* nativeTexturePtr) override;
+    virtual bool CopyResourceFromCPU(ITexture2D* dest, void* nativeTexturePtr) override;
     inline virtual GraphicsDeviceType GetDeviceType() const override;
 
 #if defined(CUDA_PLATFORM)

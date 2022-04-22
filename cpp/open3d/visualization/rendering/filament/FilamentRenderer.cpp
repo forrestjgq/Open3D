@@ -240,6 +240,25 @@ void ReadPixelsCallback(void*, size_t, void* user) {
 
 }  // namespace
 
+void FilamentRenderer::RequestReadRGBAPixels(
+        int width,
+        int height,
+        std::function<void(std::shared_ptr<core::Tensor>)> callback) {
+    core::SizeVector shape{height, width, 4};
+    core::Dtype dtype = core::UInt8;
+    int64_t nbytes = shape.NumElements() * dtype.ByteSize();
+
+    auto image = std::make_shared<core::Tensor>(shape, dtype);
+    auto* user_data = new UserData(callback, image);
+
+    using namespace filament;
+    using namespace backend;
+    PixelBufferDescriptor pd(image->GetDataPtr(), nbytes, PixelDataFormat::RGBA,
+                         PixelDataType::UBYTE, ReadPixelsCallback,
+                         user_data);
+    renderer_->readPixels(0, 0, width, height, std::move(pd));
+    needs_wait_after_draw_ = true;
+}
 void FilamentRenderer::RequestReadPixels(
         int width,
         int height,
@@ -253,7 +272,6 @@ void FilamentRenderer::RequestReadPixels(
 
     using namespace filament;
     using namespace backend;
-
     PixelBufferDescriptor pd(image->GetDataPtr(), nbytes, PixelDataFormat::RGB,
                              PixelDataType::UBYTE, ReadPixelsCallback,
                              user_data);

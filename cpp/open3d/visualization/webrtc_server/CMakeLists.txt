@@ -1,6 +1,10 @@
 open3d_ispc_add_library(webrtc_server OBJECT)
-set(FOUND_NVENC ON)
-if (FOUND_NVENC)
+if(BUILD_CUDA_MODULE)
+    find_package(CUDA REQUIRED)
+    find_package(GLUT REQUIRED)
+    target_link_libraries(Open3D PRIVATE cuda)
+    target_link_libraries(Open3D PRIVATE glut)
+    add_definitions(-D_DEBUG=0)
     add_definitions(-DUSE_NVENC -DUNITY_LINUX)
     set(nvenc_src
             NvEncoderImpl.cpp
@@ -8,13 +12,24 @@ if (FOUND_NVENC)
             nvenc/NvCodec/codec/NvEncoderGL.cpp
             nvenc/builtin_video_encoder_factory.cc
             nvenc/DummyVideoEncoder.cpp
+            nvenc/DummyVideoEncoder.h
             nvenc/internal_encoder_factory.cc
             nvenc/pch.cpp
+            nvenc/Logger.cpp
             nvenc/UnityVideoEncoderFactory.cpp
             nvenc/GraphicsDevice/IGraphicsDevice.cpp
+            nvenc/GraphicsDevice/ITexture2D.cpp
             nvenc/GraphicsDevice/OpenGL/OpenGLTexture2D.cpp
+            nvenc/GraphicsDevice/OpenGL/OpenGLTexture2D.h
             nvenc/GraphicsDevice/OpenGL/OpenGLGraphicsDevice.cpp
             nvenc/GraphicsDevice/Cuda/CudaContext.cpp
+            nvenc/Dynlink/CMakeLists.txt
+            nvenc/Dynlink/libcuda.so.init.c
+            nvenc/Dynlink/libcuda.so.tramp.S
+            nvenc/Dynlink/libnvcuvid.so.init.c
+            nvenc/Dynlink/libnvcuvid.so.tramp.S
+            nvenc/Dynlink/libnvidia-encode.so.init.c
+            nvenc/Dynlink/libnvidia-encode.so.tramp.S
             )
 else()
     message("NO NVENC")
@@ -43,7 +58,6 @@ open3d_show_and_abort_on_warning(webrtc_server)
 open3d_set_global_properties(webrtc_server)
 open3d_set_open3d_lib_properties(webrtc_server)
 open3d_link_3rdparty_libraries(webrtc_server)
-include_directories(SYSTEM "/data/src/cuda")
 
 if (NOT GUI_RESOURCE_DIR)
     message(FATAL_ERROR "GUI_RESOURCE_DIR is not defined.")

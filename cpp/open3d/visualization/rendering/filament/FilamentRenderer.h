@@ -78,6 +78,10 @@ public:
                            int height,
                            std::function<void(std::shared_ptr<core::Tensor>)>
                                    callback) override;
+    void RequestReadRGBAPixels(int width,
+                           int height,
+                           std::function<void(std::shared_ptr<core::Tensor>)>
+                           callback);
     void EndFrame() override;
 
     void SetOnAfterDraw(std::function<void()> callback) override;

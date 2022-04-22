@@ -9,6 +9,8 @@
 function(get_webrtc_args WEBRTC_ARGS)
     set(WEBRTC_ARGS "")
 
+    # to make webrtc class extension
+    set(WEBRTC_ARGS use_rtti=true\n${WEBRTC_ARGS})
     if(NOT MSVC)
         # ABI selection
         if(GLIBCXX_USE_CXX11_ABI)
