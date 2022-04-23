@@ -3,13 +3,13 @@ if(BUILD_CUDA_MODULE)
     find_package(CUDA REQUIRED)
     find_package(GLUT REQUIRED)
     target_link_libraries(Open3D PRIVATE cuda)
-    target_link_libraries(Open3D PRIVATE glut)
     add_definitions(-D_DEBUG=0)
     add_definitions(-DUSE_NVENC -DUNITY_LINUX)
     set(nvenc_src
             NvEncoderImpl.cpp
             nvenc/NvCodec/codec/NvEncoder.cpp
             nvenc/NvCodec/codec/NvEncoderGL.cpp
+#            nvenc/NvCodec/codec/PlatformEGLHeadless.cpp
             nvenc/builtin_video_encoder_factory.cc
             nvenc/DummyVideoEncoder.cpp
             nvenc/DummyVideoEncoder.h
@@ -31,6 +31,13 @@ if(BUILD_CUDA_MODULE)
             nvenc/Dynlink/libnvidia-encode.so.init.c
             nvenc/Dynlink/libnvidia-encode.so.tramp.S
             )
+    set(USE_GLUT OFF)
+    if (USE_GLUT)
+        target_link_libraries(Open3D PRIVATE glut)
+        add_definitions(-DGLUT)
+    else()
+        list(APPEND nvenc_src nvenc/NvCodec/codec/PlatformEGLHeadless.cpp)
+    endif()
 else()
     message("NO NVENC")
     set(nvenc_src)

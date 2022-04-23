@@ -1,7 +1,11 @@
 
+#ifdef GLUT
 #include <GL/glew.h>
 #include <GL/glut.h>
 #include <GL/freeglut_ext.h>
+#else
+#include "open3d/visualization/webrtc_server/nvenc/NvCodec/codec/PlatformEGLHeadless.h"
+#endif
 #include "open3d/visualization/webrtc_server/nvenc/pch.h"
 #include "NvEncoder.h"
 #include <cstring>
@@ -23,6 +27,69 @@ namespace webrtc
     static void* s_hModule = nullptr;
     static std::unique_ptr<NV_ENCODE_API_FUNCTION_LIST> pNvEncodeAPI = nullptr;
 
+#ifdef GLUT
+    struct NvEncoder::Context {
+        int m_window = 0;
+        void create(int w, int h) {
+            int argc = 1;
+            char *argv[] = {strdup("hello")};
+            glutInit(&argc, argv);
+            glutInitDisplayMode(GLUT_RGBA | GLUT_SINGLE);
+            glutInitWindowSize(w, h);
+            int window = glutCreateWindow("Lego");
+            if (!window)
+            {
+                std::cout << "Unable to create GLUT window." << std::endl;
+                return;
+            }
+            glutHideWindow();
+#if _DEBUG
+            GLuint unusedIds = 0;
+            glEnable(GL_DEBUG_OUTPUT);
+            glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+#if SUPPORT_OPENGL_CORE
+            glDebugMessageCallback(OnOpenGLDebugMessage, nullptr);
+            glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, &unusedIds, true);
+#endif
+#endif
+            m_window = window;
+        }
+        void terminate() {
+            if (m_window) glutDestroyWindow(m_window);
+        }
+        void makeContextCurrent() {
+            if (m_window) {
+                if (m_window != glutGetWindow()) {
+                    glutSetWindow(m_window);
+                }
+            }
+        }
+    };
+#else
+    struct NvEncoder::Context {
+        open3d::filament::PlatformEGLHeadless* m_egl = nullptr;
+        void create(int w, int h) {
+            m_egl = new open3d::filament::PlatformEGLHeadless();
+            if (!m_egl->createDriver(nullptr)) {
+                std::cout << "egl drv create failure" << std::endl;
+                delete m_egl;
+                m_egl = nullptr;
+            }
+        }
+        void terminate() {
+            if (m_egl) {
+                m_egl->terminate();
+                delete m_egl;
+            }
+        }
+        void makeContextCurrent() {
+            if (m_egl) {
+                m_egl->makeCurrent();
+            }
+        }
+    };
+#endif
+
     NvEncoder::NvEncoder(
         const NV_ENC_DEVICE_TYPE type,
         const NV_ENC_INPUT_RESOURCE_TYPE inputType,
@@ -39,34 +106,14 @@ namespace webrtc
     , m_inputType(inputType)
     , m_bufferFormat(bufferFormat)
     , m_clock(webrtc::Clock::GetRealTimeClock())
+    , ctx_(new NvEncoder::Context()
+                  )
     {
     }
 
     void NvEncoder::InitV()
     {
-        int argc = 1;
-
-        char *argv[] = {strdup("hello")};
-        glutInit(&argc, argv);
-        glutInitDisplayMode(GLUT_RGBA | GLUT_SINGLE);
-        glutInitWindowSize(m_width, m_height);
-        int window = glutCreateWindow("Lego");
-        if (!window)
-        {
-            std::cout << "Unable to create GLUT window." << std::endl;
-            return;
-        }
-        glutHideWindow();
-#if _DEBUG
-        GLuint unusedIds = 0;
-        glEnable(GL_DEBUG_OUTPUT);
-        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-#if SUPPORT_OPENGL_CORE
-        glDebugMessageCallback(OnOpenGLDebugMessage, nullptr);
-        glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, &unusedIds, true);
-#endif
-#endif
-        m_window = window;
+        ctx_->create(m_width, m_height);
         bool result = true;
         if (m_initializationResult == CodecInitializationResult::NotInitialized)
         {
@@ -170,7 +217,8 @@ namespace webrtc
             checkf(NV_RESULT(errorCode), "Failed to destroy NV encoder interface");
             pEncoderInterface = nullptr;
         }
-        if (m_window) glutDestroyWindow(m_window);
+        ctx_->terminate();
+        delete ctx_;
     }
 
     CodecInitializationResult NvEncoder::LoadCodec()
@@ -303,11 +351,7 @@ namespace webrtc
     }
 
 void NvEncoder::MakeContextCurrent() {
-    if (m_window) {
-        if (m_window != glutGetWindow()) {
-            glutSetWindow(m_window);
-        }
-    }
+    ctx_->makeContextCurrent();
 }
 bool NvEncoder::CopyBuffer(void* frame)
     {

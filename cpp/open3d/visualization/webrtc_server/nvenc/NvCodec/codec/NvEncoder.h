@@ -4,7 +4,11 @@
 
 #include "open3d/visualization/webrtc_server/nvenc/NvCodec/include/nvEncodeAPI.h"
 #include "open3d/visualization/webrtc_server/nvenc/IEncoder.h"
-
+namespace open3d {
+namespace filament {
+class PlatformEGLHeadless;
+}
+}
 namespace unity
 {
 namespace webrtc
@@ -96,8 +100,9 @@ namespace webrtc
         uint32_t m_frameRate = 30;
         uint32_t m_targetBitrate = 0;
         rtc::TimestampAligner timestamp_aligner_;
-        int m_window = 0;
+        struct Context;
+        Context * ctx_ = nullptr;
     };
-    
+
 } // end namespace webrtc
 } // end namespace unity
