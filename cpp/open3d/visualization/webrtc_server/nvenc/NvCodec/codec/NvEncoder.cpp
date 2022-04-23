@@ -49,8 +49,8 @@ namespace webrtc
         char *argv[] = {strdup("hello")};
         glutInit(&argc, argv);
         glutInitDisplayMode(GLUT_RGBA | GLUT_SINGLE);
-        glutInitWindowSize(800, 480);
-        int window = glutCreateWindow("AppEncGL");
+        glutInitWindowSize(m_width, m_height);
+        int window = glutCreateWindow("Lego");
         if (!window)
         {
             std::cout << "Unable to create GLUT window." << std::endl;
@@ -414,9 +414,9 @@ bool NvEncoder::CopyBuffer(void* frame)
         registerResource.height = m_height;
         if (inputType != NV_ENC_INPUT_RESOURCE_TYPE_CUDAARRAY)
         {
-            registerResource.pitch = GetWidthInBytes(m_bufferFormat, m_width);          
+            registerResource.pitch = GetWidthInBytes(m_bufferFormat, m_width);
         } else{
-            registerResource.pitch = m_width;            
+            registerResource.pitch = m_width;
         }
         registerResource.bufferFormat = m_bufferFormat;
         registerResource.bufferUsage = NV_ENC_INPUT_IMAGE;
@@ -558,6 +558,6 @@ bool NvEncoder::CopyBuffer(void* frame)
                 return 0;
         }
     }
-    
+
 } // end namespace webrtc
 } // end namespace unity

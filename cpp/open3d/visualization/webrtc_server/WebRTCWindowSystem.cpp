@@ -133,6 +133,7 @@ struct WebRTCWindowSystem::Impl {
 
     std::thread webrtc_thread_;
     bool sever_started_ = false;
+    bool pcm_created_ = false;
 
     std::unordered_map<std::string, std::function<std::string(std::string)>>
             data_channel_message_callbacks_;
@@ -354,6 +355,8 @@ void WebRTCWindowSystem::StartWebRTCServer() {
             impl_->peer_connection_manager_ =
                     std::make_unique<PeerConnectionManager>(
                             ice_servers, config["urls"], ".*", "");
+            impl_->peer_connection_manager_->Initialize();
+            impl_->pcm_created_ = true;
             impl_->peer_connection_manager_->SetAllowedPeerid(impl_->default_peerid_);
             if (!impl_->peer_connection_manager_->InitializePeerConnection()) {
                 utility::LogError("InitializePeerConnection() failed.");
@@ -516,7 +519,9 @@ void WebRTCWindowSystem::RegisterDataChannelMessageCallback(
 
 void WebRTCWindowSystem::OnFrame(const std::string &window_uid,
                                  const std::shared_ptr<core::Tensor> &im) {
-    impl_->peer_connection_manager_->OnFrame(window_uid, im);
+    if (impl_->pcm_created_) {
+        impl_->peer_connection_manager_->OnFrame(window_uid, im);
+    }
 }
 
 void WebRTCWindowSystem::SendMessage(const std::string &peerid, const std::string &msg) {

@@ -163,10 +163,7 @@ PeerConnectionManager::PeerConnectionManager(
         const Json::Value &config,
         const std::string &publish_filter,
         const std::string &webrtc_udp_port_range)
-    : task_queue_factory_(webrtc::CreateDefaultTaskQueueFactory()),
-      peer_connection_factory_(webrtc::CreateModularPeerConnectionFactory(
-              CreatePeerConnectionFactoryDependencies())),
-      ice_server_list_(ice_server_list),
+    : ice_server_list_(ice_server_list),
       config_(config),
       publish_filter_(publish_filter) {
     // Set the webrtc port range.
@@ -589,6 +586,12 @@ const Json::Value PeerConnectionManager::GetIceCandidateList(
     return value;
 }
 
+void PeerConnectionManager::Initialize() {
+    task_queue_factory_ = webrtc::CreateDefaultTaskQueueFactory();
+    peer_connection_factory_ = webrtc::CreateModularPeerConnectionFactory(
+            CreatePeerConnectionFactoryDependencies());
+    inited_ = true;
+}
 // Check if factory is initialized.
 bool PeerConnectionManager::InitializePeerConnection() {
     return (peer_connection_factory_.get() != nullptr);
@@ -808,6 +811,9 @@ void PeerConnectionManager::CloseWindowConnections(
 
 void PeerConnectionManager::OnFrame(const std::string &window_uid,
                                     const std::shared_ptr<core::Tensor> &im) {
+    if(!inited_) {
+        return;
+    }
     // Get the WebRTC stream that corresponds to the window_uid.
     // video_track_source is nullptr if the server is running but no client is
     // connected.
