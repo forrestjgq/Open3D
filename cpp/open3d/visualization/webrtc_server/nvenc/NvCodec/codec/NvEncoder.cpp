@@ -373,7 +373,12 @@ bool NvEncoder::CopyBuffer(void* frame)
         auto ptr = (void *)(long)m_renderTextures[idx];
         return m_device->CopyResourceFromNativeV(tex, ptr);
 #else
-        return m_device->CopyResourceFromCPU(tex, frame);
+        auto b = m_device->CopyResourceFromCPU(tex, frame);
+        if (b) {
+//            glFlush();
+            glFinish();
+        }
+        return b;
 #endif
     }
 
