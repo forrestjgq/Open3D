@@ -41,15 +41,21 @@
 #include "open3d/visualization/webrtc_server/nvenc/pch.h"
 #include "open3d/visualization/webrtc_server/nvenc/DummyVideoEncoder.h"
 #include "open3d/visualization/webrtc_server/NvEncodeImpl.h"
-#include "open3d/visualization/webrtc_server/nvenc/IEncoder.h"
+#include "open3d/visualization/webrtc_server/nvenc/NvCodec/codec/NvEncoder.h"
 #endif
 namespace open3d {
 namespace visualization {
 namespace webrtc_server {
 
-ImageCapturer::ImageCapturer(const std::string& url_,
+ImageCapturer::ImageCapturer(const std::string& url,
                              const std::map<std::string, std::string>& opts)
-    : ImageCapturer(opts) {
+    :  width_(0), height_(0), url_(url) {
+    if (opts.find("width") != opts.end()) {
+        width_ = std::stoi(opts.at("width"));
+    }
+    if (opts.find("height") != opts.end()) {
+        height_ = std::stoi(opts.at("height"));
+    }
 }
 
 ImageCapturer::~ImageCapturer() {
@@ -68,38 +74,28 @@ ImageCapturer* ImageCapturer::Create(
     return image_capturer.release();
 }
 
-ImageCapturer::ImageCapturer(const std::map<std::string, std::string>& opts)
-    : width_(0), height_(0) {
-    if (opts.find("width") != opts.end()) {
-        width_ = std::stoi(opts.at("width"));
-    }
-    if (opts.find("height") != opts.end()) {
-        height_ = std::stoi(opts.at("height"));
-    }
-}
-
 #ifdef USE_NVENC
 void ImageCapturer::OnCaptureResult(
         const std::shared_ptr<core::Tensor>& frame) {
     auto impl = NvEncoderImpl::GetInstance();
     if (impl_id_ == 0) {
-        auto wids = WebRTCWindowSystem::GetInstance()->GetWindowUIDs();
-        int width = 0;
-        int height = 0;
-        if (wids.size() == 1) {
-            auto w = WebRTCWindowSystem::GetInstance()->GetOSWindowByUID(wids[0]);
-            auto sz = WebRTCWindowSystem::GetInstance()->GetWindowSize(w);
-            width = sz.width;
-            height = sz.height;
+        if (url_.empty()) {
+            return;
         }
-
-        auto encoder = NvEncoderImpl::GetInstance()->AddEncoder(width, height);
+        auto w = WebRTCWindowSystem::GetInstance()->GetOSWindowByUID(url_);
+        if(w == nullptr) {
+            return;
+        }
+        auto sz = WebRTCWindowSystem::GetInstance()->GetWindowSize(w);
+        if(sz.width == 0 || sz.height == 0) {
+            return;
+        }
+        auto encoder = NvEncoderImpl::GetInstance()->AddEncoder(sz.width, sz.height);
         encoder->CaptureFrame.connect(this, &ImageCapturer::DelegateFrame);
         impl_id_ = encoder->Id();
-        NvEncoderImpl::GetInstance()->SaveEncoder(encoder);
 
     }
-    impl->EncodeFrame(impl_id_, frame->GetDataPtr());
+    impl->EncodeFrame(impl_id_, frame);
 }
 void ImageCapturer::DelegateFrame(const webrtc::VideoFrame &frame) {
     broadcaster_.OnFrame(frame);

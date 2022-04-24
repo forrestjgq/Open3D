@@ -11,8 +11,7 @@ namespace webrtc
         NvEncoderGL(uint32_t nWidth, uint32_t nHeight, IGraphicsDevice* device, UnityRenderingExtTextureFormat textureFormat);
         ~NvEncoderGL() override;
     protected:
-        virtual void* AllocateInputResourceV(ITexture2D* tex) override;
-        virtual void ReleaseInputResourceV(void* pResource) override;
+        std::shared_ptr<void> AllocateInputResourceV(ITexture2D* tex) override;
     };
 
 } // end namespace webrtc

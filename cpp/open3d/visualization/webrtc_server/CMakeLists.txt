@@ -1,54 +1,62 @@
 open3d_ispc_add_library(webrtc_server OBJECT)
 if(BUILD_CUDA_MODULE)
     find_package(CUDA REQUIRED)
-    find_package(GLUT REQUIRED)
     target_link_libraries(Open3D PRIVATE cuda)
     add_definitions(-D_DEBUG=0)
     add_definitions(-DUSE_NVENC -DUNITY_LINUX)
     set(nvenc_src
-            NvEncoderImpl.cpp
-            nvenc/NvCodec/codec/NvEncoder.cpp
-            nvenc/NvCodec/codec/NvEncoderGL.cpp
-#            nvenc/NvCodec/codec/PlatformEGLHeadless.cpp
-            nvenc/builtin_video_encoder_factory.cc
-            nvenc/DummyVideoEncoder.cpp
-            nvenc/DummyVideoEncoder.h
-            nvenc/internal_encoder_factory.cc
-            nvenc/pch.cpp
-            nvenc/Logger.cpp
-            nvenc/UnityVideoEncoderFactory.cpp
-            nvenc/GraphicsDevice/IGraphicsDevice.cpp
-            nvenc/GraphicsDevice/ITexture2D.cpp
-            nvenc/GraphicsDevice/OpenGL/OpenGLTexture2D.cpp
-            nvenc/GraphicsDevice/OpenGL/OpenGLTexture2D.h
-            nvenc/GraphicsDevice/OpenGL/OpenGLGraphicsDevice.cpp
-            nvenc/GraphicsDevice/Cuda/CudaContext.cpp
-            nvenc/Dynlink/CMakeLists.txt
-            nvenc/Dynlink/libcuda.so.init.c
-            nvenc/Dynlink/libcuda.so.tramp.S
-            nvenc/Dynlink/libnvcuvid.so.init.c
-            nvenc/Dynlink/libnvcuvid.so.tramp.S
-            nvenc/Dynlink/libnvidia-encode.so.init.c
-            nvenc/Dynlink/libnvidia-encode.so.tramp.S
-            )
+        NvEncoderImpl.cpp
+        nvenc/NvCodec/codec/NvEncoder.cpp
+        nvenc/NvCodec/codec/NvEncoderGL.cpp
+        nvenc/builtin_video_encoder_factory.cc
+        nvenc/DummyVideoEncoder.cpp
+        nvenc/DummyVideoEncoder.h
+        nvenc/internal_encoder_factory.cc
+        nvenc/pch.cpp
+        nvenc/Logger.cpp
+        nvenc/UnityVideoEncoderFactory.cpp
+        nvenc/GraphicsDevice/IGraphicsDevice.cpp
+        nvenc/GraphicsDevice/ITexture2D.cpp
+        nvenc/GraphicsDevice/OpenGL/OpenGLTexture2D.cpp
+        nvenc/GraphicsDevice/OpenGL/OpenGLTexture2D.h
+        nvenc/GraphicsDevice/OpenGL/OpenGLGraphicsDevice.cpp
+        nvenc/GraphicsDevice/Cuda/CudaContext.cpp
+        nvenc/Dynlink/CMakeLists.txt
+        nvenc/Dynlink/libcuda.so.init.c
+        nvenc/Dynlink/libcuda.so.tramp.S
+        nvenc/Dynlink/libnvcuvid.so.init.c
+        nvenc/Dynlink/libnvcuvid.so.tramp.S
+        nvenc/Dynlink/libnvidia-encode.so.init.c
+        nvenc/Dynlink/libnvidia-encode.so.tramp.S
+    )
+    # we could use EGL or GLUT to create GL context
+    # set USE_GLUT ON to use GLUT, or use EGL
     set(USE_GLUT OFF)
     if (USE_GLUT)
-        target_link_libraries(Open3D PRIVATE glut)
-        add_definitions(-DGLUT)
-    else()
+        find_package(GLUT REQUIRED)
+        if (NOT GLUT_FOUND)
+            set(USE_GLUT OFF)
+        else()
+            target_link_libraries(Open3D PRIVATE glut)
+            add_definitions(-DGLUT)
+        endif()
+    endif()
+    if (NOT USE_GLUT)
+        # use EGL
         list(APPEND nvenc_src nvenc/NvCodec/codec/PlatformEGLHeadless.cpp)
     endif()
 else()
-    message("NO NVENC")
+    # NVENC is not supported
     set(nvenc_src)
 endif()
+
 target_sources(webrtc_server PRIVATE
     BitmapTrackSource.cpp
     HttpServerRequestHandler.cpp
     ImageCapturer.cpp
     PeerConnectionManager.cpp
     WebRTCWindowSystem.cpp
-        ${nvenc_src}
+    ${nvenc_src}
 )
 
 

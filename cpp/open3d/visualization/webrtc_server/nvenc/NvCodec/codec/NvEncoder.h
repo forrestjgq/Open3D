@@ -4,6 +4,7 @@
 
 #include "open3d/visualization/webrtc_server/nvenc/NvCodec/include/nvEncodeAPI.h"
 #include "open3d/visualization/webrtc_server/nvenc/IEncoder.h"
+#include "open3d/core/Tensor.h"
 namespace open3d {
 namespace filament {
 class PlatformEGLHeadless;
@@ -41,8 +42,21 @@ namespace webrtc
             int height,
             IGraphicsDevice* device,
             UnityRenderingExtTextureFormat textureFormat);
-        virtual ~NvEncoder();
+        ~NvEncoder() override;
 
+        void doInContext(std::function<void()> f);
+        void RecvOpen3DCPUFrame(const std::shared_ptr<open3d::core::Tensor>& frame);
+        void SetRates(uint32_t bitRate, int64_t frameRate) override;
+        void MakeContextCurrent() override;
+        bool CopyBuffer(void* frame) override;
+        bool CopyBufferFromCPU(void* frame) override;
+        bool EncodeFrame(int64_t timestamp_us) override;
+        bool IsSupported() const override { return m_isNvEncoderSupported; }
+        void SetIdrFrame()  override { isIdrFrame = true; }
+        uint64 GetCurrentFrameCount() const override { return frameCount; }
+        void InitV() override;
+    protected:
+        void UpdateSettings() override;
         static CodecInitializationResult LoadCodec();
         static bool LoadModule();
         static bool CheckDriverVersion();
@@ -51,16 +65,6 @@ namespace webrtc
         static uint32_t GetChromaHeight(const NV_ENC_BUFFER_FORMAT bufferFormat, const uint32_t lumaHeight);
         static uint32_t GetWidthInBytes(const NV_ENC_BUFFER_FORMAT bufferFormat, const uint32_t width);
 
-        void InitV() override;
-        void SetRates(uint32_t bitRate, int64_t frameRate) override;
-        void UpdateSettings() override;
-        void MakeContextCurrent() override;
-        bool CopyBuffer(void* frame) override;
-        bool CopyBufferFromCPU(void* frame) override;
-        bool EncodeFrame(int64_t timestamp_us) override;
-        bool IsSupported() const override { return m_isNvEncoderSupported; }
-        void SetIdrFrame()  override { isIdrFrame = true; }
-        uint64 GetCurrentFrameCount() const override { return frameCount; }
     protected:
         int m_width;
         int m_height;
@@ -73,8 +77,7 @@ namespace webrtc
 
         bool m_isNvEncoderSupported = false;
 
-        virtual void* AllocateInputResourceV(ITexture2D* tex) = 0;
-        virtual void ReleaseInputResourceV(void* pResource) = 0;
+        virtual std::shared_ptr<void> AllocateInputResourceV(ITexture2D* tex) = 0;
 
         void InitEncoderResources();
         void ReleaseEncoderResources();
@@ -90,7 +93,7 @@ namespace webrtc
         NVENCSTATUS errorCode;
         Frame bufferedFrames[bufferedFrameNum];
         ITexture2D* m_renderTextures[bufferedFrameNum] = {};
-        std::vector<void*> m_buffers;
+        std::vector<std::shared_ptr<void>> m_buffers;
         uint64 frameCount = 0;
         void* pEncoderInterface = nullptr;
         bool isIdrFrame = false;

@@ -51,7 +51,7 @@ class ImageCapturer : public rtc::VideoSourceInterface<webrtc::VideoFrame>
 #endif
 {
 public:
-    ImageCapturer(const std::string& url_,
+    ImageCapturer(const std::string& url,
                   const std::map<std::string, std::string>& opts);
     virtual ~ImageCapturer();
 
@@ -59,7 +59,6 @@ public:
             const std::string& url,
             const std::map<std::string, std::string>& opts);
 
-    ImageCapturer(const std::map<std::string, std::string>& opts);
 
     virtual void AddOrUpdateSink(
             rtc::VideoSinkInterface<webrtc::VideoFrame>* sink,
@@ -77,6 +76,7 @@ protected:
     int width_;
     int height_;
     rtc::VideoBroadcaster broadcaster_;
+    std::string url_;
 #ifdef USE_NVENC
     uint32_t impl_id_ = 0;
 #endif

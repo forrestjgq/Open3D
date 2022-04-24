@@ -18,6 +18,7 @@
 #else
 #include <dlfcn.h>
 #endif
+#include "open3d/visualization/webrtc_server/nvenc/NvCodec/codec/thread_pool.h"
 
 namespace unity
 {
@@ -27,15 +28,30 @@ namespace webrtc
     static void* s_hModule = nullptr;
     static std::unique_ptr<NV_ENCODE_API_FUNCTION_LIST> pNvEncodeAPI = nullptr;
 
-#ifdef GLUT
     struct NvEncoder::Context {
-        int m_window = 0;
+        int width_ = 0;
+        int height_ = 0;
+        std::unique_ptr<vega::DoableStation> station_;
         void create(int w, int h) {
+            width_ = w;
+            height_ = h;
+            station_ = std::make_unique<vega::DoableStation>("NvEncoder");
+            doAsync([this](){ _create(); });
+        }
+        void destroy() {
+            doAsync([this]() { _terminate(); });
+        }
+        void doAsync(vega::CallbackDoable::Callback callback) const {
+            station_->doAsync(callback);
+        }
+#ifdef GLUT
+        int m_window = 0;
+        void create() {
             int argc = 1;
             char *argv[] = {strdup("hello")};
             glutInit(&argc, argv);
             glutInitDisplayMode(GLUT_RGBA | GLUT_SINGLE);
-            glutInitWindowSize(w, h);
+            glutInitWindowSize(width_, height_);
             int window = glutCreateWindow("Lego");
             if (!window)
             {
@@ -54,7 +70,7 @@ namespace webrtc
 #endif
             m_window = window;
         }
-        void terminate() {
+        void _terminate() {
             if (m_window) glutDestroyWindow(m_window);
         }
         void makeContextCurrent() {
@@ -66,25 +82,24 @@ namespace webrtc
         }
     };
 #else
-    struct NvEncoder::Context {
-        open3d::filament::PlatformEGLHeadless* m_egl = nullptr;
-        void create(int w, int h) {
-            m_egl = new open3d::filament::PlatformEGLHeadless();
-            if (!m_egl->createDriver(nullptr)) {
+        open3d::filament::PlatformEGLHeadless* egl_ = nullptr;
+        void _create() {
+            egl_ = new open3d::filament::PlatformEGLHeadless();
+            if (!egl_->createDriver(nullptr)) {
                 std::cout << "egl drv create failure" << std::endl;
-                delete m_egl;
-                m_egl = nullptr;
+                delete egl_;
+                egl_ = nullptr;
             }
         }
-        void terminate() {
-            if (m_egl) {
-                m_egl->terminate();
-                delete m_egl;
+        void _terminate() {
+            if (egl_) {
+                egl_->terminate();
+                delete egl_;
             }
         }
         void makeContextCurrent() {
-            if (m_egl) {
-                m_egl->makeCurrent();
+            if (egl_) {
+                egl_->makeCurrent();
             }
         }
     };
@@ -109,11 +124,12 @@ namespace webrtc
     , ctx_(new NvEncoder::Context()
                   )
     {
+        ctx_->create(m_width, m_height);
+        ctx_->doAsync([this](){NvEncoder::InitV();});
     }
 
     void NvEncoder::InitV()
     {
-        ctx_->create(m_width, m_height);
         bool result = true;
         if (m_initializationResult == CodecInitializationResult::NotInitialized)
         {
@@ -211,14 +227,27 @@ namespace webrtc
 
     NvEncoder::~NvEncoder()
     {
-        if (pEncoderInterface)
-        {
-            errorCode = pNvEncodeAPI->nvEncDestroyEncoder(pEncoderInterface);
-            checkf(NV_RESULT(errorCode), "Failed to destroy NV encoder interface");
-            pEncoderInterface = nullptr;
-        }
-        ctx_->terminate();
+        ctx_->doAsync([this](){
+            this->ReleaseEncoderResources();
+            if (this->pEncoderInterface) {
+                this->errorCode = pNvEncodeAPI->nvEncDestroyEncoder(this->pEncoderInterface);
+                checkf(NV_RESULT(this->errorCode), "Failed to destroy NV encoder interface");
+                this->pEncoderInterface = nullptr;
+            }
+        });
+        ctx_->destroy();
         delete ctx_;
+    }
+
+    void NvEncoder::doInContext(std::function<void()> f) {
+        ctx_->doAsync(f);
+    }
+    void NvEncoder::RecvOpen3DCPUFrame(const std::shared_ptr<open3d::core::Tensor>& frame) {
+        ctx_->doAsync([this, frame](){
+            CopyBufferFromCPU(frame->GetDataPtr());
+            int64_t timestamp_us = m_clock->TimeInMicroseconds();
+            EncodeFrame(timestamp_us);
+        });
     }
 
     CodecInitializationResult NvEncoder::LoadCodec()
@@ -495,10 +524,10 @@ bool NvEncoder::CopyBuffer(void* frame)
         for (uint32 i = 0; i < bufferedFrameNum; i++)
         {
             m_renderTextures[i] = m_device->CreateDefaultTextureV(m_width, m_height, m_textureFormat);
-            void* buffer = AllocateInputResourceV(m_renderTextures[i]);
+            auto buffer = AllocateInputResourceV(m_renderTextures[i]);
             m_buffers.push_back(buffer);
             Frame& frame = bufferedFrames[i];
-            frame.inputFrame.registeredResource = RegisterResource(m_inputType, buffer);
+            frame.inputFrame.registeredResource = RegisterResource(m_inputType, buffer.get());
             frame.inputFrame.bufferFormat = m_bufferFormat;
             MapResources(frame.inputFrame);
             frame.outputFrame = InitializeBitstreamBuffer();
@@ -536,10 +565,7 @@ bool NvEncoder::CopyBuffer(void* frame)
             delete renderTexture;
             renderTexture = nullptr;
         }
-        for (auto &buffer : m_buffers)
-        {
-            ReleaseInputResourceV(buffer);
-        }
+        m_buffers.clear();
     }
 
     uint32_t NvEncoder::GetNumChromaPlanes(const NV_ENC_BUFFER_FORMAT bufferFormat)

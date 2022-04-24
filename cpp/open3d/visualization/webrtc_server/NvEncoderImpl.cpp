@@ -42,39 +42,31 @@ void NvEncoderImpl::SetRates(uint32_t id, uint32_t bitRate, int64_t frameRate) {
     }
 }
 
-void NvEncoderImpl::DelegateOnFrame(const ::webrtc::VideoFrame& frame) {}
-unity::webrtc::IEncoder* NvEncoderImpl::AddEncoder(int width, int height) {
-#if defined(CUDA_PLATFORM)
-    (void) m_device->GetCUcontext();
-#else
-#error set opengl context
-#endif
+std::shared_ptr<unity::webrtc::NvEncoder> NvEncoderImpl::AddEncoder(int width, int height) {
+//#if defined(CUDA_PLATFORM)
+//    (void) m_device->GetCUcontext();
+//#else
+//#error set opengl context
+//#endif
     auto dev = (unity::webrtc::IGraphicsDevice *)m_device.get();
-    auto encoder = new unity::webrtc::NvEncoderGL(width, height, dev, default_texture);
-    encoder->InitV();
+    auto encoder = std::make_shared<unity::webrtc::NvEncoderGL>(width, height, dev, default_texture);
     auto id = GenerateUniqueId();
     encoder->SetEncoderId(id);
+    m_mapIdAndEncoder[encoder->Id()] = encoder;
     return encoder;
-}
-void NvEncoderImpl::SaveEncoder(unity::webrtc::IEncoder *encoder) {
-    auto t = std::unique_ptr<unity::webrtc::IEncoder>(encoder);
-    m_mapIdAndEncoder[encoder->Id()] = std::move(t);
 }
 void NvEncoderImpl::RemoveEncoder(uint32_t id) {
     m_mapIdAndEncoder.erase(id);
 }
-void NvEncoderImpl::EncodeFrame(uint32_t id, void *frame) {
-#if defined(CUDA_PLATFORM)
-    (void) m_device->GetCUcontext();
-#else
-#error set opengl context
-#endif
+void NvEncoderImpl::EncodeFrame(uint32_t id, const std::shared_ptr<core::Tensor>& frame) {
+//#if defined(CUDA_PLATFORM)
+//    (void) m_device->GetCUcontext();
+//#else
+//#error set opengl context
+//#endif
 
     if(m_mapIdAndEncoder.count(id)) {
-        m_mapIdAndEncoder[id]->MakeContextCurrent();
-        m_mapIdAndEncoder[id]->CopyBufferFromCPU(frame);
-        int64_t timestamp_us = m_clock->TimeInMicroseconds();
-        m_mapIdAndEncoder[id]->EncodeFrame(timestamp_us);
+        m_mapIdAndEncoder[id]->RecvOpen3DCPUFrame(frame);
     }
 }
 }
