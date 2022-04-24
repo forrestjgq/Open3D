@@ -159,7 +159,7 @@ namespace webrtc
     using int32 = signed int;
     using int64 = signed long long;
 
-    const uint32 bufferedFrameNum = 3;
+    const uint32 bufferedFrameNum = 1;
 
     /// todo(kazuki):: rename the type since it is also used to determine the decoder type.
     enum UnityEncoderType

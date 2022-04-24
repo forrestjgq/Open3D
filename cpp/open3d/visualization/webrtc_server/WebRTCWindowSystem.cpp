@@ -277,6 +277,7 @@ WebRTCWindowSystem::OSWindow WebRTCWindowSystem::CreateOSWindow(
     StartWebRTCServer();
     WebRTCWindowSystem::OSWindow os_window = BitmapWindowSystem::CreateOSWindow(
             o3d_window, width, height, title, flags);
+    SetRegularRedraw(os_window, 200);  // force a redraw at least every 100ms
     std::string window_uid = impl_->GenerateUID();
     impl_->os_window_to_uid_.insert({os_window, window_uid});
     utility::LogInfo("Window {} created.", window_uid);
@@ -541,14 +542,14 @@ void WebRTCWindowSystem::SendInitFrames(const std::string &window_uid) {
     static const int s_sleep_between_frames_ms = 100;
     const auto os_window = GetOSWindowByUID(window_uid);
     if (!os_window) return;
-    PostCallableEvent([this]() { ForceRender(true); });
+//    PostCallableEvent([this]() { ForceRender(true); });
     for (int i = 0; os_window != nullptr && i < s_max_initial_frames; ++i) {
         PostRedrawEvent(os_window);
         std::this_thread::sleep_for(
                 std::chrono::milliseconds(s_sleep_between_frames_ms));
         utility::LogDebug("Sent init frames #{} to {}.", i, window_uid);
     }
-    PostCallableEvent([this]() { ForceRender(false); });
+//    PostCallableEvent([this]() { ForceRender(false); });
 }
 
 std::string WebRTCWindowSystem::CallHttpAPI(const std::string &entry_point,

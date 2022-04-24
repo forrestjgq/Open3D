@@ -77,6 +77,7 @@ public:
     void PostMouseEvent(OSWindow w, const MouseEvent& e);
     void PostKeyEvent(OSWindow w, const KeyEvent& e);
     void PostTextInputEvent(OSWindow w, const TextInputEvent& e);
+    void SetRegularRedraw(OSWindow w, int ms);
 
     bool GetWindowIsVisible(OSWindow w) const override;
     void ShowWindow(OSWindow w, bool show) override;

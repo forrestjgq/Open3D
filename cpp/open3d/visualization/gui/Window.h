@@ -122,6 +122,7 @@ public:
     /// Sends a draw event to the window through the operating system's
     /// event queue.
     void PostRedraw();
+    void EnableRegularRedraw(int ms);
 
     void SetTopmost(bool topmost);
     void RaiseToTop() const;

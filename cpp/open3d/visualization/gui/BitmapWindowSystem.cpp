@@ -249,6 +249,10 @@ void BitmapWindowSystem::PostCallableEvent(std::function<void()> todo) {
     impl_->event_queue_.push(std::make_shared<BitmapCallableEvent>(todo));
 }
 
+void BitmapWindowSystem::SetRegularRedraw(OSWindow w, int ms) {
+    auto hw = (BitmapWindow *)w;
+    hw->o3d_window->EnableRegularRedraw(ms);
+}
 void BitmapWindowSystem::PostRedrawEvent(OSWindow w) {
     auto hw = (BitmapWindow *)w;
     impl_->event_queue_.push(std::make_shared<BitmapDrawEvent>(hw));

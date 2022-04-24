@@ -95,6 +95,8 @@ void ImageCapturer::OnCaptureResult(
         impl_id_ = encoder->Id();
 
     }
+//    static long cnt = 0;
+//    std::cout << "encode frame " << cnt++ << std::endl;
     impl->EncodeFrame(impl_id_, frame);
 }
 void ImageCapturer::DelegateFrame(const webrtc::VideoFrame &frame) {
