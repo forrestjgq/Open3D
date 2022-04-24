@@ -16,7 +16,7 @@ NvEncoderImpl *NvEncoderImpl::GetInstance() {
     static NvEncoderImpl impl;
     return &impl;
 }
-static UnityRenderingExtTextureFormat default_texture = kUnityRenderingExtFormatR8G8B8_SRGB;
+static UnityRenderingExtTextureFormat default_texture = kUnityRenderingExtFormatR8G8B8A8_SRGB;
 //#pragma region open an encode session
 uint32_t NvEncoderImpl::s_encoderId = 1;
 uint32_t NvEncoderImpl::GenerateUniqueId() { return s_encoderId++; }

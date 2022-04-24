@@ -193,7 +193,7 @@ namespace webrtc
         checkf(NV_RESULT(errorCode), "Failed to select NVEncoder preset config");
         std::memcpy(&nvEncConfig, &presetConfig.presetCfg, sizeof(NV_ENC_CONFIG));
         nvEncConfig.profileGUID = NV_ENC_H264_PROFILE_BASELINE_GUID;
-        nvEncConfig.gopLength = nvEncInitializeParams.frameRateNum;
+        nvEncConfig.gopLength = nvEncInitializeParams.frameRateNum / 3;
         nvEncConfig.rcParams.rateControlMode = NV_ENC_PARAMS_RC_CBR_LOWDELAY_HQ;
         nvEncConfig.rcParams.averageBitRate =
             (static_cast<unsigned int>(5.0f *
@@ -244,9 +244,10 @@ namespace webrtc
     }
     void NvEncoder::RecvOpen3DCPUFrame(const std::shared_ptr<open3d::core::Tensor>& frame) {
         ctx_->doAsync([this, frame](){
-            CopyBufferFromCPU(frame->GetDataPtr());
-            int64_t timestamp_us = m_clock->TimeInMicroseconds();
-            EncodeFrame(timestamp_us);
+            if(CopyBufferFromCPU(frame->GetDataPtr())) {
+                int64_t timestamp_us = m_clock->TimeInMicroseconds();
+                EncodeFrame(timestamp_us);
+            }
         });
     }
 
