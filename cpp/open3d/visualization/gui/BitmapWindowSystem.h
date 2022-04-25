@@ -114,6 +114,7 @@ public:
     MenuBase* CreateOSMenu() override;
 
     void SetMaxRenderFPS(int fps);
+    int GetMaxRenderFPS();
     void ForceRender(bool render);
 
 private:

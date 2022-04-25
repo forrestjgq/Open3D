@@ -613,6 +613,22 @@ let WebRtcStreamer = (function() {
                                 console.log(
                                         'Create offer:' +
                                         JSON.stringify(sessionDescription));
+                                // https://stackoverflow.com/questions/57653899/how-to-increase-the-bitrate-of-webrtc
+                                var arr = sessionDescription.sdp.split('\r\n');
+                                arr.forEach((str, i) => {
+                                    if (/^a=fmtp:\d*/.test(str)) {
+                                        arr[i] = str + ';x-google-max-bitrate=3500;x-google-min-bitrate=0;x-google-start-bitrate=3000';
+                                    } else if (/^a=mid:(1|video)/.test(str)) {
+                                        arr[i] += '\r\nb=AS:3500';
+                                    }
+                                });
+                                // sessionDescription = new RTCSessionDescription({
+                                //     type: 'offer',
+                                //     sdp: arr.join('\r\n'),
+                                // })
+                                // console.log(
+                                //     'Modified offer:' +
+                                //     JSON.stringify(sessionDescription));
 
                                 bind.pc.setLocalDescription(
                                     sessionDescription,

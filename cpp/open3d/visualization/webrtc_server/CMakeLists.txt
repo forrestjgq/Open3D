@@ -4,6 +4,7 @@ if(BUILD_CUDA_MODULE)
     target_link_libraries(Open3D PRIVATE cuda)
     add_definitions(-D_DEBUG=0)
     add_definitions(-DUSE_NVENC -DUNITY_LINUX)
+    add_definitions(-DPASSIVE_MODE=1)
     set(nvenc_src
         NvEncoderImpl.cpp
         nvenc/NvCodec/codec/NvEncoder.cpp

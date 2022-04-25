@@ -277,7 +277,9 @@ WebRTCWindowSystem::OSWindow WebRTCWindowSystem::CreateOSWindow(
     StartWebRTCServer();
     WebRTCWindowSystem::OSWindow os_window = BitmapWindowSystem::CreateOSWindow(
             o3d_window, width, height, title, flags);
-    SetRegularRedraw(os_window, 200);  // force a redraw at least every 100ms
+#if !PASSIVE_MODE
+    SetRegularRedraw(os_window, 200);  // force redraw regularly
+#endif
     std::string window_uid = impl_->GenerateUID();
     impl_->os_window_to_uid_.insert({os_window, window_uid});
     utility::LogInfo("Window {} created.", window_uid);

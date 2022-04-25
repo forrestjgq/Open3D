@@ -19,6 +19,7 @@
 #include <dlfcn.h>
 #endif
 #include "open3d/visualization/webrtc_server/nvenc/NvCodec/codec/thread_pool.h"
+#include "open3d/visualization/webrtc_server/WebRTCWindowSystem.h"
 
 namespace unity
 {
@@ -35,15 +36,22 @@ namespace webrtc
         void create(int w, int h) {
             width_ = w;
             height_ = h;
+#if !PASSIVE_MODE
             station_ = std::make_unique<vega::DoableStation>("NvEncoder");
             doAsync([this](){ _create(); });
+#endif
+            _create();
         }
+
+#if !PASSIVE_MODE
         void destroy() {
             doAsync([this]() { _terminate(); });
         }
         void doAsync(vega::CallbackDoable::Callback callback) const {
+            assert(station_);
             station_->doAsync(callback);
         }
+#endif
 #ifdef GLUT
         int m_window = 0;
         void create() {
@@ -121,11 +129,18 @@ namespace webrtc
     , m_inputType(inputType)
     , m_bufferFormat(bufferFormat)
     , m_clock(webrtc::Clock::GetRealTimeClock())
-    , ctx_(new NvEncoder::Context()
-                  )
     {
+        auto fps = open3d::visualization::webrtc_server::WebRTCWindowSystem::GetInstance()->GetMaxRenderFPS();
+        if (fps > 0) {
+            m_frameRate = fps;
+        }
+#if PASSIVE_MODE
+        thread_ = std::make_shared<std::thread>(std::bind(&NvEncoder::Work, this));
+#else
+        ctx_ = new NvEncoder::Context();
         ctx_->create(m_width, m_height);
-        ctx_->doAsync([this](){NvEncoder::InitV();});
+        doInContext([this](){NvEncoder::InitV();});
+#endif
     }
 
     void NvEncoder::InitV()
@@ -193,7 +208,7 @@ namespace webrtc
         checkf(NV_RESULT(errorCode), "Failed to select NVEncoder preset config");
         std::memcpy(&nvEncConfig, &presetConfig.presetCfg, sizeof(NV_ENC_CONFIG));
         nvEncConfig.profileGUID = NV_ENC_H264_PROFILE_BASELINE_GUID;
-        nvEncConfig.gopLength = nvEncInitializeParams.frameRateNum / 3;
+        nvEncConfig.gopLength = nvEncInitializeParams.frameRateNum / 2;
         nvEncConfig.rcParams.rateControlMode = NV_ENC_PARAMS_RC_CBR_LOWDELAY_HQ;
         nvEncConfig.rcParams.averageBitRate =
             (static_cast<unsigned int>(5.0f *
@@ -205,7 +220,9 @@ namespace webrtc
         nvEncConfig.encodeCodecConfig.h264Config.sliceModeData = 0;
         nvEncConfig.encodeCodecConfig.h264Config.repeatSPSPPS = 1;
         //Quality Control
-        nvEncConfig.encodeCodecConfig.h264Config.level = NV_ENC_LEVEL_H264_51;
+//        nvEncConfig.encodeCodecConfig.h264Config.level = NV_ENC_LEVEL_AUTOSELECT;
+//        nvEncConfig.encodeCodecConfig.h264Config.level = NV_ENC_LEVEL_H264_51;
+          nvEncConfig.encodeCodecConfig.h264Config.level = NV_ENC_LEVEL_H264_52;
 //#pragma endregion
 //#pragma region get encoder capability
         NV_ENC_CAPS_PARAM capsParam = {};
@@ -227,7 +244,12 @@ namespace webrtc
 
     NvEncoder::~NvEncoder()
     {
-        ctx_->doAsync([this](){
+#if PASSIVE_MODE
+        doInContext([this](){ this->end_ = true;});
+        thread_->join();
+        thread_.reset();
+#else
+        doInContext([this](){
             this->ReleaseEncoderResources();
             if (this->pEncoderInterface) {
                 this->errorCode = pNvEncodeAPI->nvEncDestroyEncoder(this->pEncoderInterface);
@@ -237,18 +259,89 @@ namespace webrtc
         });
         ctx_->destroy();
         delete ctx_;
+#endif
     }
+#if PASSIVE_MODE
+    void NvEncoder::Work() {
+        Context ctx;
+        ctx.create(m_width, m_height);
+        InitV();
 
-    void NvEncoder::doInContext(std::function<void()> f) {
+        int64_t ts = 0;
+        int64_t rate = m_frameRate;
+        int64_t du = 1000000/rate;
+        const int64_t sleep_ms = 5;
+        while (!end_) {
+            decltype(frame_) frame;
+            decltype(requests_) requests;
+            {
+                std::unique_lock<std::mutex> lock(mt_);
+                requests = std::move(requests_);
+            }
+            for (auto &r: requests) {
+                r();
+            }
+            requests.clear();
+
+            int64_t now = m_clock->TimeInMicroseconds();
+            if (ts > 0) {
+                auto diff = now - ts;
+//                std::cout << "diff " << diff << " du " << du << std::endl;
+                if (diff < du && du - diff > sleep_ms * 1000) {
+                    // we have enough time to wait
+//                    std::cout << "sleep" << std::endl;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+                    continue;
+                }
+            }
+            ts = now;
+            {
+                std::unique_lock<std::mutex> lock(mt_);
+                frame = frame_;
+                frame_.reset();
+            }
+            if (frame) {
+                if (!CopyBufferFromCPU(frame->GetDataPtr())) {
+                    open3d::utility::LogInfo("fail to copy frame from CPU");
+                } else {
+                    // ts should be updated
+                    ts = m_clock->TimeInMicroseconds();
+                }
+            }
+//            std::cout << "encode at " << ts << std::endl;
+            EncodeFrame(ts);
+            frameCount--;
+        }
+        this->ReleaseEncoderResources();
+        if (this->pEncoderInterface) {
+            this->errorCode = pNvEncodeAPI->nvEncDestroyEncoder(this->pEncoderInterface);
+            checkf(NV_RESULT(this->errorCode), "Failed to destroy NV encoder interface");
+            this->pEncoderInterface = nullptr;
+        }
+        ctx._terminate();
+    }
+#endif
+
+    void NvEncoder::doInContext(std::function<void()> &&f) {
+#if PASSIVE_MODE
+        std::unique_lock<std::mutex> lock(mt_);
+        requests_.push_back(f);
+#else
         ctx_->doAsync(f);
+#endif
     }
     void NvEncoder::RecvOpen3DCPUFrame(const std::shared_ptr<open3d::core::Tensor>& frame) {
-        ctx_->doAsync([this, frame](){
+#if PASSIVE_MODE
+        std::unique_lock<std::mutex> lock(mt_);
+        frame_ = frame;
+#else
+        doInContext([this, frame](){
             if(CopyBufferFromCPU(frame->GetDataPtr())) {
                 int64_t timestamp_us = m_clock->TimeInMicroseconds();
                 EncodeFrame(timestamp_us);
             }
         });
+#endif
     }
 
     CodecInitializationResult NvEncoder::LoadCodec()
@@ -373,16 +466,21 @@ namespace webrtc
         }
     }
 
-    void NvEncoder::SetRates(uint32_t bitRate, int64_t frameRate)
-    {
-        m_frameRate = static_cast<uint32_t>(frameRate);
-        m_targetBitrate = bitRate;
-        isIdrFrame = true;
+    void NvEncoder::SetIdrFrame()  {
+        doInContext([=](){
+            this->isIdrFrame = true;
+        });
+    }
+    void NvEncoder::SetRates(uint32_t bitRate, int64_t frameRate){
+        std::cout << "biterate " << bitRate/(8*1024) << "KB frame rate " << frameRate << std::endl;
+        doInContext([=](){
+            this->m_frameRate = static_cast<uint32_t>(frameRate);
+            this->m_targetBitrate = bitRate ;
+            this->isIdrFrame = true;
+
+        });
     }
 
-void NvEncoder::MakeContextCurrent() {
-    ctx_->makeContextCurrent();
-}
 bool NvEncoder::CopyBuffer(void* frame)
     {
         const int curFrameNum = GetCurrentFrameCount() % bufferedFrameNum;

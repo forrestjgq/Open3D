@@ -1,6 +1,8 @@
 #pragma once
 #include <vector>
 #include <rtc_base/timestamp_aligner.h>
+#include <mutex>
+#include <thread>
 
 #include "open3d/visualization/webrtc_server/nvenc/NvCodec/include/nvEncodeAPI.h"
 #include "open3d/visualization/webrtc_server/nvenc/IEncoder.h"
@@ -44,15 +46,14 @@ namespace webrtc
             UnityRenderingExtTextureFormat textureFormat);
         ~NvEncoder() override;
 
-        void doInContext(std::function<void()> f);
+        void doInContext(std::function<void()> &&f);
         void RecvOpen3DCPUFrame(const std::shared_ptr<open3d::core::Tensor>& frame);
         void SetRates(uint32_t bitRate, int64_t frameRate) override;
-        void MakeContextCurrent() override;
         bool CopyBuffer(void* frame) override;
         bool CopyBufferFromCPU(void* frame) override;
         bool EncodeFrame(int64_t timestamp_us) override;
         bool IsSupported() const override { return m_isNvEncoderSupported; }
-        void SetIdrFrame()  override { isIdrFrame = true; }
+        void SetIdrFrame()  override;
         uint64 GetCurrentFrameCount() const override { return frameCount; }
         void InitV() override;
     protected:
@@ -65,7 +66,12 @@ namespace webrtc
         static uint32_t GetChromaHeight(const NV_ENC_BUFFER_FORMAT bufferFormat, const uint32_t lumaHeight);
         static uint32_t GetWidthInBytes(const NV_ENC_BUFFER_FORMAT bufferFormat, const uint32_t width);
 
+#if PASSIVE_MODE
+        void Work();
+#endif
+
     protected:
+
         int m_width;
         int m_height;
         IGraphicsDevice* m_device;
@@ -103,8 +109,16 @@ namespace webrtc
         uint32_t m_frameRate = 30;
         uint32_t m_targetBitrate = 0;
         rtc::TimestampAligner timestamp_aligner_;
+        // for active mode
         struct Context;
         Context * ctx_ = nullptr;
+
+        // for passive mode
+        std::vector<std::function<void()>> requests_;
+        std::shared_ptr<open3d::core::Tensor> frame_;
+        std::mutex mt_;
+        bool end_ = false;
+        std::shared_ptr<std::thread> thread_;
     };
 
 } // end namespace webrtc

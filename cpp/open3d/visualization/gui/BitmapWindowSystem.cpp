@@ -166,6 +166,7 @@ struct BitmapWindowSystem::Impl {
     BitmapWindowSystem::OnDrawCallback on_draw_;
     BitmapEventQueue event_queue_;
     bool rgba_ = false;
+    int max_fps_ = 0;
     int max_redraw_du_ = 0;
     int force_draw_requested_ = 0;
     std::chrono::high_resolution_clock::time_point last_draw_ = now();
@@ -375,7 +376,11 @@ void BitmapWindowSystem::ResizeRenderer(OSWindow w,
     renderer->UpdateBitmapSwapChain(size.width, size.height);
 }
 
+int BitmapWindowSystem::GetMaxRenderFPS() {
+    return impl_->max_fps_;
+}
 void BitmapWindowSystem::SetMaxRenderFPS(int fps) {
+    impl_->max_fps_ = fps;
     if (fps <= 0) {
         utility::LogInfo("disable webrtc render fps limitation");
         impl_->max_redraw_du_ = 0;
