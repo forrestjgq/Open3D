@@ -50,6 +50,7 @@ std::shared_ptr<unity::webrtc::NvEncoder> NvEncoderImpl::AddEncoder(int width, i
 //#endif
     auto dev = (unity::webrtc::IGraphicsDevice *)m_device.get();
     auto encoder = std::make_shared<unity::webrtc::NvEncoderGL>(width, height, dev, default_texture);
+    encoder->InitInternal();
     auto id = GenerateUniqueId();
     encoder->SetEncoderId(id);
     m_mapIdAndEncoder[encoder->Id()] = encoder;

@@ -1,10 +1,11 @@
 open3d_ispc_add_library(webrtc_server OBJECT)
 if(BUILD_CUDA_MODULE)
+
+
     find_package(CUDA REQUIRED)
     target_link_libraries(Open3D PRIVATE cuda)
     add_definitions(-D_DEBUG=0)
     add_definitions(-DUSE_NVENC -DUNITY_LINUX)
-    add_definitions(-DPASSIVE_MODE=1)
     set(nvenc_src
         NvEncoderImpl.cpp
         nvenc/NvCodec/codec/NvEncoder.cpp
@@ -30,21 +31,24 @@ if(BUILD_CUDA_MODULE)
         nvenc/Dynlink/libnvidia-encode.so.init.c
         nvenc/Dynlink/libnvidia-encode.so.tramp.S
     )
-    # we could use EGL or GLUT to create GL context
-    # set USE_GLUT ON to use GLUT, or use EGL
-    set(USE_GLUT OFF)
-    if (USE_GLUT)
+    set(CTX_USAGE "egl")
+    add_definitions(-DCTX_GLUT=1 -DCTX_EGL=2)
+    if(${CTX_USAGE} STREQUAL "glut")
         find_package(GLUT REQUIRED)
-        if (NOT GLUT_FOUND)
-            set(USE_GLUT OFF)
-        else()
-            target_link_libraries(Open3D PRIVATE glut)
-            add_definitions(-DGLUT)
-        endif()
-    endif()
-    if (NOT USE_GLUT)
-        # use EGL
+        target_link_libraries(Open3D PRIVATE glut)
+        add_definitions(-DCTX_TYPE=1)
+    elseif(${CTX_USAGE} STREQUAL "egl")
         list(APPEND nvenc_src nvenc/NvCodec/codec/PlatformEGLHeadless.cpp)
+        add_definitions(-DCTX_TYPE=2)
+    endif()
+
+    set(SCHED_MODE "passive")
+#    set(SCHED_MODE "active")
+    add_definitions(-DPASSIVE_MODE=1 -DACTIVE_MODE=2)
+    if(${SCHED_MODE} STREQUAL "passive")
+        add_definitions(-DSCHED_MODE=1)
+    elseif(${SCHED_MODE} STREQUAL "active")
+        add_definitions(-DSCHED_MODE=2)
     endif()
 else()
     # NVENC is not supported

@@ -59,6 +59,12 @@ void OpenGLGraphicsDevice::ShutdownV() {
 #endif
 }
 
+#define CHECK_ERR() do { \
+    auto err = glGetError(); \
+    if (err != 0) {   \
+            std::cout << __FILE__ << ":" << __LINE__ << ": opengl error " << err << std::endl; \
+}\
+    } while(0)
 //---------------------------------------------------------------------------------------------------------------------
 ITexture2D* OpenGLGraphicsDevice::CreateDefaultTextureV(
     uint32_t w, uint32_t h, UnityRenderingExtTextureFormat textureFormat) 
@@ -108,12 +114,6 @@ bool OpenGLGraphicsDevice::CopyResourceFromNativeV(ITexture2D* dest, void* nativ
     const GLuint srcName = reinterpret_cast<uintptr_t>(nativeTexturePtr);
     return CopyResource(dstName, srcName, width, height);
 }
-#define CHECK_ERR() do { \
-    auto err = glGetError(); \
-    if (err != 0) {   \
-            std::cout << __FILE__ << ":" << __LINE__ << ": opengl error " << err << std::endl; \
-}\
-    } while(0)
 #if 1
 bool OpenGLGraphicsDevice::CopyResourceFromCPU(ITexture2D* dest, void* nativeTexturePtr) {
     const uint32_t width = dest->GetWidth();

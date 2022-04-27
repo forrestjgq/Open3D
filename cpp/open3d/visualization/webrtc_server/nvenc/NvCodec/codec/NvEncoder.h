@@ -19,6 +19,8 @@ namespace webrtc
     using OutputFrame = NV_ENC_OUTPUT_PTR;
     class ITexture2D;
     class IGraphicsDevice;
+    class Scheduler;
+    class GLContext;
     class NvEncoder : public IEncoder
     {
     private:
@@ -56,7 +58,9 @@ namespace webrtc
         void SetIdrFrame()  override;
         uint64 GetCurrentFrameCount() const override { return frameCount; }
         void InitV() override;
+        void InitInternal();
     protected:
+        void Release();
         void UpdateSettings() override;
         static CodecInitializationResult LoadCodec();
         static bool LoadModule();
@@ -65,10 +69,7 @@ namespace webrtc
         static uint32_t GetNumChromaPlanes(NV_ENC_BUFFER_FORMAT);
         static uint32_t GetChromaHeight(const NV_ENC_BUFFER_FORMAT bufferFormat, const uint32_t lumaHeight);
         static uint32_t GetWidthInBytes(const NV_ENC_BUFFER_FORMAT bufferFormat, const uint32_t width);
-
-#if PASSIVE_MODE
-        void Work();
-#endif
+        void WorkInPassive();
 
     protected:
 
@@ -110,15 +111,15 @@ namespace webrtc
         uint32_t m_targetBitrate = 0;
         rtc::TimestampAligner timestamp_aligner_;
         // for active mode
-        struct Context;
-        Context * ctx_ = nullptr;
+        GLContext * ctx_ = nullptr;
+        Scheduler *sched_ = nullptr;
 
         // for passive mode
         std::vector<std::function<void()>> requests_;
         std::shared_ptr<open3d::core::Tensor> frame_;
         std::mutex mt_;
         bool end_ = false;
-        std::shared_ptr<std::thread> thread_;
+        bool exit_ = false;
     };
 
 } // end namespace webrtc

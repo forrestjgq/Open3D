@@ -1,9 +1,9 @@
 
-#ifdef GLUT
+#if CTX_TYPE == CTX_GLUT
 #include <GL/glew.h>
 #include <GL/glut.h>
 #include <GL/freeglut_ext.h>
-#else
+#elif CTX_TYPE == CTX_EGL
 #include "open3d/visualization/webrtc_server/nvenc/NvCodec/codec/PlatformEGLHeadless.h"
 #endif
 #include "open3d/visualization/webrtc_server/nvenc/pch.h"
@@ -28,33 +28,89 @@ namespace webrtc
 
     static void* s_hModule = nullptr;
     static std::unique_ptr<NV_ENCODE_API_FUNCTION_LIST> pNvEncodeAPI = nullptr;
+    using Call = std::function<void ()>;
 
-    struct NvEncoder::Context {
+    class Scheduler {
+    public:
+        Scheduler() = default;
+        virtual ~Scheduler() = default;
+        virtual void doAsync(Call &&f) = 0;
+    };
+    class StationScheduler: public Scheduler {
+    public:
+        StationScheduler() {
+            station_ = std::make_unique<vega::DoableStation>("NvEncoder");
+        }
+        ~StationScheduler() override = default;
+        void doAsync(Call &&f) override {
+            station_->doAsync(f);
+        }
+
+    private:
+        std::unique_ptr<vega::DoableStation> station_;
+    };
+    class ThreadScheduler: public Scheduler {
+    public:
+        ThreadScheduler() { }
+        ~ThreadScheduler() override {
+            thread_->join();
+            thread_.reset();
+        }
+        void doAsync(Call &&f) override {
+            thread_ = std::make_shared<std::thread>(f);
+        }
+    private:
+        std::shared_ptr<std::thread> thread_;
+    };
+
+    class GLContext {
+    public:
+        GLContext(int w, int h): width_(w), height_(h) {}
+        virtual ~GLContext() = default;
+        virtual void create() = 0;
+        virtual void makeCurrent() = 0;
         int width_ = 0;
         int height_ = 0;
-        std::unique_ptr<vega::DoableStation> station_;
-        void create(int w, int h) {
-            width_ = w;
-            height_ = h;
-#if !PASSIVE_MODE
-            station_ = std::make_unique<vega::DoableStation>("NvEncoder");
-            doAsync([this](){ _create(); });
-#endif
-            _create();
-        }
+    };
 
-#if !PASSIVE_MODE
-        void destroy() {
-            doAsync([this]() { _terminate(); });
+#if CTX_TYPE == CTX_EGL
+    class EglContext : public GLContext {
+    public:
+        EglContext(int w, int h): GLContext(w, h) {
+
         }
-        void doAsync(vega::CallbackDoable::Callback callback) const {
-            assert(station_);
-            station_->doAsync(callback);
+        ~EglContext() override {
+            if (egl_) {
+                egl_->terminate();
+                egl_.reset();
+            }
         }
+        void create() override {
+            egl_ = std::make_shared<open3d::filament::PlatformEGLHeadless>();
+            if (!egl_->createDriver(nullptr)) {
+                std::cout << "egl drv create failure" << std::endl;
+                egl_.reset();
+            }
+        }
+        void makeCurrent() override {
+            if (egl_) {
+                egl_->makeCurrent();
+            }
+        }
+        std::shared_ptr<open3d::filament::PlatformEGLHeadless> egl_;
+    };
+    using CtxType = EglContext;
 #endif
-#ifdef GLUT
+#if CTX_TYPE == CTX_GLUT
+    class GlutContext : public GLContext {
+    public:
+        GlutContext(int w, int h): GLContext(w, h) {
+        }
+        ~GlutContext() override {
+            if (m_window) glutDestroyWindow(m_window);
+        }
         int m_window = 0;
-        void create() {
+        void create() override {
             int argc = 1;
             char *argv[] = {strdup("hello")};
             glutInit(&argc, argv);
@@ -67,21 +123,9 @@ namespace webrtc
                 return;
             }
             glutHideWindow();
-#if _DEBUG
-            GLuint unusedIds = 0;
-            glEnable(GL_DEBUG_OUTPUT);
-            glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-#if SUPPORT_OPENGL_CORE
-            glDebugMessageCallback(OnOpenGLDebugMessage, nullptr);
-            glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, &unusedIds, true);
-#endif
-#endif
             m_window = window;
         }
-        void _terminate() {
-            if (m_window) glutDestroyWindow(m_window);
-        }
-        void makeContextCurrent() {
+        void makeCurrent() override {
             if (m_window) {
                 if (m_window != glutGetWindow()) {
                     glutSetWindow(m_window);
@@ -89,28 +133,7 @@ namespace webrtc
             }
         }
     };
-#else
-        open3d::filament::PlatformEGLHeadless* egl_ = nullptr;
-        void _create() {
-            egl_ = new open3d::filament::PlatformEGLHeadless();
-            if (!egl_->createDriver(nullptr)) {
-                std::cout << "egl drv create failure" << std::endl;
-                delete egl_;
-                egl_ = nullptr;
-            }
-        }
-        void _terminate() {
-            if (egl_) {
-                egl_->terminate();
-                delete egl_;
-            }
-        }
-        void makeContextCurrent() {
-            if (egl_) {
-                egl_->makeCurrent();
-            }
-        }
-    };
+    using CtxType = GlutContext;
 #endif
 
     NvEncoder::NvEncoder(
@@ -134,17 +157,20 @@ namespace webrtc
         if (fps > 0) {
             m_frameRate = fps;
         }
-#if PASSIVE_MODE
-        thread_ = std::make_shared<std::thread>(std::bind(&NvEncoder::Work, this));
-#else
-        ctx_ = new NvEncoder::Context();
-        ctx_->create(m_width, m_height);
-        doInContext([this](){NvEncoder::InitV();});
+        sched_ = new StationScheduler();
+    }
+    void NvEncoder::InitInternal() {
+#if SCHED_MODE == PASSIVE_MODE
+        sched_->doAsync([this](){ this->WorkInPassive(); });
+#elif SCHED_MODE == ACTIVE_MODE
+        doInContext([this](){ this->InitV(); });
 #endif
     }
 
     void NvEncoder::InitV()
     {
+        ctx_ = new CtxType(m_width, m_height);
+        ctx_->create();
         bool result = true;
         if (m_initializationResult == CodecInitializationResult::NotInitialized)
         {
@@ -164,13 +190,6 @@ namespace webrtc
         openEncodeSessionExParams.apiVersion = NVENCAPI_VERSION;
 
         errorCode = pNvEncodeAPI->nvEncOpenEncodeSessionEx(&openEncodeSessionExParams, &pEncoderInterface);
-
-        if(!(NV_RESULT(errorCode)))
-        {
-            m_initializationResult = CodecInitializationResult::EncoderInitializationFailed;
-            return;
-        }
-
         checkf(NV_RESULT(errorCode), "Unable to open NvEnc encode session");
 //#pragma endregion
 //#pragma region set initialization parameters
@@ -242,29 +261,27 @@ namespace webrtc
         m_isNvEncoderSupported = true;
     }
 
+    void NvEncoder::Release() {
+        ReleaseEncoderResources();
+        if (pEncoderInterface) {
+            errorCode = pNvEncodeAPI->nvEncDestroyEncoder(pEncoderInterface);
+            checkf(NV_RESULT(errorCode), "Failed to destroy NV encoder interface");
+            pEncoderInterface = nullptr;
+        }
+        delete ctx_;
+        ctx_ = nullptr;
+    }
     NvEncoder::~NvEncoder()
     {
-#if PASSIVE_MODE
+#if SCHED_MODE == PASSIVE_MODE
         doInContext([this](){ this->end_ = true;});
-        thread_->join();
-        thread_.reset();
-#else
-        doInContext([this](){
-            this->ReleaseEncoderResources();
-            if (this->pEncoderInterface) {
-                this->errorCode = pNvEncodeAPI->nvEncDestroyEncoder(this->pEncoderInterface);
-                checkf(NV_RESULT(this->errorCode), "Failed to destroy NV encoder interface");
-                this->pEncoderInterface = nullptr;
-            }
-        });
-        ctx_->destroy();
-        delete ctx_;
+#elif SCHED_MODE == ACTIVE_MODE
+        doInContext([this](){ this->Release(); });
 #endif
+        delete sched_;
+        sched_ = nullptr;
     }
-#if PASSIVE_MODE
-    void NvEncoder::Work() {
-        Context ctx;
-        ctx.create(m_width, m_height);
+    void NvEncoder::WorkInPassive() {
         InitV();
 
         int64_t ts = 0;
@@ -312,29 +329,22 @@ namespace webrtc
             EncodeFrame(ts);
             frameCount--;
         }
-        this->ReleaseEncoderResources();
-        if (this->pEncoderInterface) {
-            this->errorCode = pNvEncodeAPI->nvEncDestroyEncoder(this->pEncoderInterface);
-            checkf(NV_RESULT(this->errorCode), "Failed to destroy NV encoder interface");
-            this->pEncoderInterface = nullptr;
-        }
-        ctx._terminate();
+        Release();
     }
-#endif
 
     void NvEncoder::doInContext(std::function<void()> &&f) {
-#if PASSIVE_MODE
+#if SCHED_MODE == PASSIVE_MODE
         std::unique_lock<std::mutex> lock(mt_);
         requests_.push_back(f);
-#else
-        ctx_->doAsync(f);
+#elif SCHED_MODE == ACTIVE_MODE
+        sched_->doAsync(std::move(f));
 #endif
     }
     void NvEncoder::RecvOpen3DCPUFrame(const std::shared_ptr<open3d::core::Tensor>& frame) {
-#if PASSIVE_MODE
+#if SCHED_MODE == PASSIVE_MODE
         std::unique_lock<std::mutex> lock(mt_);
         frame_ = frame;
-#else
+#elif SCHED_MODE == ACTIVE_MODE
         doInContext([this, frame](){
             if(CopyBufferFromCPU(frame->GetDataPtr())) {
                 int64_t timestamp_us = m_clock->TimeInMicroseconds();
@@ -349,14 +359,12 @@ namespace webrtc
         pNvEncodeAPI = std::make_unique<NV_ENCODE_API_FUNCTION_LIST>();
         pNvEncodeAPI->version = NV_ENCODE_API_FUNCTION_LIST_VER;
 
-        if (!LoadModule())
-        {
-            return CodecInitializationResult::DriverNotInstalled;
+        if (!LoadModule()) {
+            open3d::utility::LogError("Load module fail");
         }
 
-        if(!CheckDriverVersion())
-        {
-            return CodecInitializationResult::DriverVersionDoesNotSupportAPI;
+        if(!CheckDriverVersion()) {
+            open3d::utility::LogError("Check driver version fail");
         }
 
         using NvEncodeAPICreateInstance_Type = NVENCSTATUS(NVENCAPI *)(NV_ENCODE_API_FUNCTION_LIST*);
@@ -368,13 +376,12 @@ namespace webrtc
 
         if (!NvEncodeAPICreateInstance)
         {
-            RTC_LOG(LS_INFO) << "Cannot find NvEncodeAPICreateInstance() entry in NVENC library";
+            open3d::utility::LogError("Cannot find NvEncodeAPICreateInstance() entry in NVENC library");
             return CodecInitializationResult::APINotFound;
         }
         bool result = (NvEncodeAPICreateInstance(pNvEncodeAPI.get()) == NV_ENC_SUCCESS);
         checkf(result, "Unable to create NvEnc API function list");
-        if (!result)
-        {
+        if (!result) {
             return CodecInitializationResult::APINotFound;
         }
         return CodecInitializationResult::Success;
@@ -396,7 +403,7 @@ namespace webrtc
         NvEncodeAPIGetMaxSupportedVersion(&version);
         if (currentVersion > version)
         {
-            RTC_LOG(LS_INFO) << "Current Driver Version does not support this NvEncodeAPI version, please upgrade driver";
+            open3d::utility::LogError("Current Driver Version does not support this NvEncodeAPI version, please upgrade driver");
             return false;
         }
         return true;
@@ -419,7 +426,7 @@ namespace webrtc
 
         if (module == nullptr)
         {
-            RTC_LOG(LS_INFO) << "NVENC library file is not found. Please ensure NV driver is installed";
+            open3d::utility::LogError("NVENC library file is not found. Please ensure NV driver is installed");
             return false;
         }
         s_hModule = module;
@@ -472,7 +479,7 @@ namespace webrtc
         });
     }
     void NvEncoder::SetRates(uint32_t bitRate, int64_t frameRate){
-        std::cout << "biterate " << bitRate/(8*1024) << "KB frame rate " << frameRate << std::endl;
+//        std::cout << "biterate " << bitRate/(8*1024) << "KB frame rate " << frameRate << std::endl;
         doInContext([=](){
             this->m_frameRate = static_cast<uint32_t>(frameRate);
             this->m_targetBitrate = bitRate ;
