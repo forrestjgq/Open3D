@@ -51,7 +51,7 @@ public:
         HEADLESS  // uses EGL, does not require the OS to have a window system.
                   // (Linux only)
     };
-    BitmapWindowSystem(Rendering mode = Rendering::NORMAL, bool rgba=false);
+    BitmapWindowSystem(Rendering mode = Rendering::NORMAL, bool fake_read=false);
     ~BitmapWindowSystem();
 
     void Initialize() override;
@@ -116,6 +116,7 @@ public:
     void SetMaxRenderFPS(int fps);
     int GetMaxRenderFPS();
     void ForceRender(bool render);
+    Window *GetO3DWindow(OSWindow w);
 
 private:
     struct Impl;

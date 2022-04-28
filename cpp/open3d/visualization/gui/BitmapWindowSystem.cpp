@@ -165,7 +165,7 @@ static int duration(const std::chrono::high_resolution_clock::time_point &e,
 struct BitmapWindowSystem::Impl {
     BitmapWindowSystem::OnDrawCallback on_draw_;
     BitmapEventQueue event_queue_;
-    bool rgba_ = false;
+    bool fake_read_ = false;  // fake reading pixels
     int max_fps_ = 0;
     int max_redraw_du_ = 0;
     int force_draw_requested_ = 0;
@@ -173,9 +173,9 @@ struct BitmapWindowSystem::Impl {
 };
 
 BitmapWindowSystem::BitmapWindowSystem(Rendering mode /*= Rendering::NORMAL*/,
-                                       bool rgba /*= false*/)
+                                       bool fake_read /*= false*/)
     : impl_(new BitmapWindowSystem::Impl()) {
-    impl_->rgba_ = rgba;
+    impl_->fake_read_ = fake_read;
     if (mode == Rendering::HEADLESS) {
 #if !defined(__APPLE__) && !defined(_WIN32) && !defined(_WIN64)
         rendering::EngineInstance::EnableHeadless();
@@ -320,6 +320,10 @@ float BitmapWindowSystem::GetUIScaleFactor(OSWindow w) const { return 1.0f; }
 
 void BitmapWindowSystem::SetWindowTitle(OSWindow w, const char *title) {}
 
+Window *BitmapWindowSystem::GetO3DWindow(OSWindow w) {
+    return ((BitmapWindow *)w)->o3d_window;
+}
+
 Point BitmapWindowSystem::GetMousePosInWindow(OSWindow w) const {
     return ((BitmapWindow *)w)->mouse_pos;
 }
@@ -353,16 +357,16 @@ rendering::FilamentRenderer *BitmapWindowSystem::CreateRenderer(OSWindow w) {
         }
 
         auto size = this->GetWindowSizePixels(w);
-        Window *window = ((BitmapWindow *)w)->o3d_window;
-
-        auto on_pixels = [this, window](std::shared_ptr<core::Tensor> image) {
-            if (this->impl_->on_draw_) {
-                this->impl_->on_draw_(window, image);
-            }
-        };
-        if(impl_->rgba_) {
-            renderer->RequestReadRGBAPixels(size.width, size.height, on_pixels);
+        if(impl_->fake_read_) {
+            renderer->RequestReadPixels(size.width, size.height, nullptr);
         } else {
+            Window *window = ((BitmapWindow *)w)->o3d_window;
+
+            auto on_pixels = [this, window](std::shared_ptr<core::Tensor> image) {
+                if (this->impl_->on_draw_) {
+                    this->impl_->on_draw_(window, image);
+                }
+            };
             renderer->RequestReadPixels(size.width, size.height, on_pixels);
         }
     };

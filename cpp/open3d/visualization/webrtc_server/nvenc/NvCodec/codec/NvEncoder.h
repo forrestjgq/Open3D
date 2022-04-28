@@ -50,10 +50,13 @@ namespace webrtc
 
         void doInContext(std::function<void()> &&f);
         void RecvOpen3DCPUFrame(const std::shared_ptr<open3d::core::Tensor>& frame);
+        void RecvFromFilament(void *fbo, void *pbo);
+        void WaitFrameDone();
         void SetRates(uint32_t bitRate, int64_t frameRate) override;
         bool CopyBuffer(void* frame) override;
         bool CopyBufferFromCPU(void* frame) override;
         bool EncodeFrame(int64_t timestamp_us) override;
+        int32 EncodeFrameEx(int64_t timestamp_us);
         bool IsSupported() const override { return m_isNvEncoderSupported; }
         void SetIdrFrame()  override;
         uint64 GetCurrentFrameCount() const override { return frameCount; }
@@ -61,6 +64,7 @@ namespace webrtc
         void InitInternal();
     protected:
         void Release();
+        bool Keep();
         void UpdateSettings() override;
         static CodecInitializationResult LoadCodec();
         static bool LoadModule();
@@ -91,7 +95,7 @@ namespace webrtc
 
     private:
         void ReleaseFrameInputBuffer(Frame& frame);
-        void ProcessEncodedFrame(Frame& frame, int64_t timestamp_us);
+        void ProcessEncodedFrame(int32 bufferIndexToWrite, int64_t timestamp_us);
         NV_ENC_REGISTERED_PTR RegisterResource(NV_ENC_INPUT_RESOURCE_TYPE type, void *pBuffer);
         void MapResources(InputFrame& inputFrame);
         NV_ENC_OUTPUT_PTR InitializeBitstreamBuffer();
@@ -119,7 +123,14 @@ namespace webrtc
         std::shared_ptr<open3d::core::Tensor> frame_;
         std::mutex mt_;
         bool end_ = false;
-        bool exit_ = false;
+
+
+        // for filament hook
+        int64_t last_ts = 0;
+        int64_t fps_ = 0;
+        int64_t du_ = 0;
+        std::atomic_int32_t waited_frame_{-1};
+        int64_t waited_ts_ = 0;
     };
 
 } // end namespace webrtc

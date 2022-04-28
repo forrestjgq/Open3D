@@ -62,6 +62,11 @@
 #include "open3d/visualization/rendering/filament/FilamentScene.h"
 #include "open3d/visualization/rendering/filament/FilamentView.h"
 
+void SchedCallbacker(filament::backend::PresentCallable callable, void *user) {
+    auto uds = (void **)user;
+    auto me = (open3d::visualization::rendering::FilamentRenderer *)uds[1];
+    me->OnFilamentCallback(user);
+}
 namespace open3d {
 namespace visualization {
 namespace rendering {
@@ -244,39 +249,51 @@ void FilamentRenderer::RequestReadRGBAPixels(
         int width,
         int height,
         std::function<void(std::shared_ptr<core::Tensor>)> callback) {
-    core::SizeVector shape{height, width, 4};
-    core::Dtype dtype = core::UInt8;
-    int64_t nbytes = shape.NumElements() * dtype.ByteSize();
-
-    auto image = std::make_shared<core::Tensor>(shape, dtype);
-    auto* user_data = new UserData(callback, image);
-
     using namespace filament;
     using namespace backend;
-    PixelBufferDescriptor pd(image->GetDataPtr(), nbytes, PixelDataFormat::RGBA,
-                         PixelDataType::UBYTE, ReadPixelsCallback,
-                         user_data);
+    void *user_data = nullptr;
+    void *data = nullptr;
+    int64_t nbytes = 0;
+    PixelBufferDescriptor::Callback cb = nullptr;
+    if(callback) {
+        core::SizeVector shape{height, width, 4};
+        core::Dtype dtype = core::UInt8;
+        nbytes = shape.NumElements() * dtype.ByteSize();
+        auto image = std::make_shared<core::Tensor>(shape, dtype);
+        user_data = new UserData(callback, image);
+        cb = ReadPixelsCallback;
+        data = image->GetDataPtr();
+        needs_wait_after_draw_ = true;
+    }
+
+    PixelBufferDescriptor pd(data, nbytes, PixelDataFormat::RGBA,
+                         PixelDataType::UBYTE, cb, user_data);
     renderer_->readPixels(0, 0, width, height, std::move(pd));
-    needs_wait_after_draw_ = true;
+
 }
 void FilamentRenderer::RequestReadPixels(
         int width,
         int height,
         std::function<void(std::shared_ptr<core::Tensor>)> callback) {
-    core::SizeVector shape{height, width, 3};
-    core::Dtype dtype = core::UInt8;
-    int64_t nbytes = shape.NumElements() * dtype.ByteSize();
-
-    auto image = std::make_shared<core::Tensor>(shape, dtype);
-    auto* user_data = new UserData(callback, image);
-
     using namespace filament;
     using namespace backend;
-    PixelBufferDescriptor pd(image->GetDataPtr(), nbytes, PixelDataFormat::RGB,
-                             PixelDataType::UBYTE, ReadPixelsCallback,
-                             user_data);
+    void *user_data = nullptr;
+    void *data = (void *)(long)0x1234;
+    PixelBufferDescriptor::Callback cb = nullptr;
+    core::SizeVector shape{height, width, 4};
+    core::Dtype dtype = core::UInt8;
+    int64_t nbytes = shape.NumElements() * dtype.ByteSize();
+    if(callback) {
+        auto image = std::make_shared<core::Tensor>(shape, dtype);
+        user_data = new UserData(callback, image);
+        cb = ReadPixelsCallback;
+        data = image->GetDataPtr();
+        needs_wait_after_draw_ = true;
+    }
+
+    PixelBufferDescriptor pd(data, nbytes, PixelDataFormat::RGB,
+                             PixelDataType::UBYTE, cb, user_data);
     renderer_->readPixels(0, 0, width, height, std::move(pd));
-    needs_wait_after_draw_ = true;
 }
 
 MaterialHandle FilamentRenderer::AddMaterial(
@@ -416,6 +433,20 @@ TextureHandle FilamentRenderer::AddTexture(const t::geometry::Image& image,
     return resource_mgr_.CreateTexture(image, srgb);
 }
 
+void FilamentRenderer::SetFilamentCallback(SchedCallback callback, void *user) {
+    filament_callback_ = callback;
+    filament_ud = user;
+    swap_chain_->setFrameScheduledCallback(SchedCallbacker, this);
+
+}
+void FilamentRenderer::OnFilamentCallback(void *user) {
+    if(filament_callback_) {
+        void **uds = (void **)user;
+        uds[1] = filament_ud;
+        filament_callback_((const char *)uds[0], filament_ud, uds[2], uds[3], uds[4]);
+    }
+
+}
 // void FilamentRenderer::OnBufferRenderDestroyed(FilamentRenderToBuffer*
 // render) {
 //    buffer_renderers_.erase(render);

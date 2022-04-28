@@ -78,7 +78,7 @@ protected:
     rtc::VideoBroadcaster broadcaster_;
     std::string url_;
 #ifdef USE_NVENC
-    uint32_t impl_id_ = 0;
+    std::atomic_uint32_t impl_id_ {0};
 #endif
 };
 

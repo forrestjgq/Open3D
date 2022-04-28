@@ -449,6 +449,9 @@ std::string Window::GetWebRTCUID() const {
 #endif
 }
 
+void Window::SetRenderCallback(RenderCallback callback, void *user) {
+    impl_->renderer_->SetFilamentCallback(callback, user);
+}
 const std::vector<std::shared_ptr<Widget>>& Window::GetChildren() const {
     return impl_->children_;
 }

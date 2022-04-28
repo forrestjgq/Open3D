@@ -159,7 +159,10 @@ WebRTCWindowSystem::WebRTCWindowSystem()
 #else
               BitmapWindowSystem::Rendering::NORMAL
 #endif
-              ,false),
+#if CTX_TYPE == CTX_FILAMENT
+              ,true
+#endif
+              ),
       impl_(new WebRTCWindowSystem::Impl()) {
 
     // impl_->web_root_ is filled at StartWebRTCServer. It relies on
@@ -277,7 +280,7 @@ WebRTCWindowSystem::OSWindow WebRTCWindowSystem::CreateOSWindow(
     StartWebRTCServer();
     WebRTCWindowSystem::OSWindow os_window = BitmapWindowSystem::CreateOSWindow(
             o3d_window, width, height, title, flags);
-#if !PASSIVE_MODE
+#if ACTIVE_MODE == SCHED_MODE || SCHED_MODE == HOOK_MODE
     SetRegularRedraw(os_window, 200);  // force redraw regularly
 #endif
     std::string window_uid = impl_->GenerateUID();

@@ -56,12 +56,29 @@ ImageCapturer::ImageCapturer(const std::string& url,
     if (opts.find("height") != opts.end()) {
         height_ = std::stoi(opts.at("height"));
     }
+
+    if (url_.empty()) {
+        return;
+    }
+    auto w = WebRTCWindowSystem::GetInstance()->GetOSWindowByUID(url_);
+    if(w == nullptr) {
+        return;
+    }
+    auto sz = WebRTCWindowSystem::GetInstance()->GetWindowSize(w);
+    if(sz.width == 0 || sz.height == 0) {
+        return;
+    }
+    auto o3d = WebRTCWindowSystem::GetInstance()->GetO3DWindow(w);
+    NvEncoderImpl::GetInstance()->AddEncoder(sz.width, sz.height, o3d, [this](auto encoder){
+        encoder->CaptureFrame.connect(this, &ImageCapturer::DelegateFrame);
+        impl_id_.store(encoder->Id());
+    });
 }
 
-ImageCapturer::~ImageCapturer() {
+    ImageCapturer::~ImageCapturer() {
 #ifdef USE_NVENC
-    if (impl_id_) {
-        NvEncoderImpl::GetInstance()->RemoveEncoder(impl_id_);
+        if (impl_id_.load() > 0) {
+        NvEncoderImpl::GetInstance()->RemoveEncoder(impl_id_.load());
         impl_id_ = 0;
     }
 #endif
@@ -77,27 +94,17 @@ ImageCapturer* ImageCapturer::Create(
 #ifdef USE_NVENC
 void ImageCapturer::OnCaptureResult(
         const std::shared_ptr<core::Tensor>& frame) {
-    auto impl = NvEncoderImpl::GetInstance();
-    if (impl_id_ == 0) {
-        if (url_.empty()) {
-            return;
-        }
-        auto w = WebRTCWindowSystem::GetInstance()->GetOSWindowByUID(url_);
-        if(w == nullptr) {
-            return;
-        }
-        auto sz = WebRTCWindowSystem::GetInstance()->GetWindowSize(w);
-        if(sz.width == 0 || sz.height == 0) {
-            return;
-        }
-        auto encoder = NvEncoderImpl::GetInstance()->AddEncoder(sz.width, sz.height);
-        encoder->CaptureFrame.connect(this, &ImageCapturer::DelegateFrame);
-        impl_id_ = encoder->Id();
-
-    }
 //    static long cnt = 0;
 //    std::cout << "encode frame " << cnt++ << std::endl;
-    impl->EncodeFrame(impl_id_, frame);
+    auto impl = NvEncoderImpl::GetInstance();
+    if (impl_id_.load() > 0) {
+        impl->EncodeFrame(impl_id_, frame);
+    } else {
+#if CTX_TYPE == CTX_FILAMENT
+        auto w = WebRTCWindowSystem::GetInstance()->GetOSWindowByUID(url_);
+        WebRTCWindowSystem::GetInstance()->PostRedrawEvent(w);
+#endif
+    }
 }
 void ImageCapturer::DelegateFrame(const webrtc::VideoFrame &frame) {
     broadcaster_.OnFrame(frame);

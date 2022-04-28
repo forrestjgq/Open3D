@@ -49,19 +49,6 @@ namespace webrtc
     private:
         std::unique_ptr<vega::DoableStation> station_;
     };
-    class ThreadScheduler: public Scheduler {
-    public:
-        ThreadScheduler() { }
-        ~ThreadScheduler() override {
-            thread_->join();
-            thread_.reset();
-        }
-        void doAsync(Call &&f) override {
-            thread_ = std::make_shared<std::thread>(f);
-        }
-    private:
-        std::shared_ptr<std::thread> thread_;
-    };
 
     class GLContext {
     public:
@@ -135,6 +122,18 @@ namespace webrtc
     };
     using CtxType = GlutContext;
 #endif
+#if CTX_TYPE == CTX_FILAMENT
+    class FilamentContext : public GLContext {
+    public:
+        FilamentContext(int w, int h): GLContext(w, h) {
+        }
+        ~FilamentContext() override {
+        }
+        void create() override { }
+        void makeCurrent() override { }
+    };
+    using CtxType = FilamentContext;
+#endif
 
     NvEncoder::NvEncoder(
         const NV_ENC_DEVICE_TYPE type,
@@ -157,6 +156,12 @@ namespace webrtc
         if (fps > 0) {
             m_frameRate = fps;
         }
+#if CTX_TYPE == CTX_FILAMENT
+        fps_ = m_frameRate;
+        du_ = 1000000/fps_;
+        open3d::utility::LogInfo("NvEncoder FPS {}", fps_);
+#endif
+
         sched_ = new StationScheduler();
     }
     void NvEncoder::InitInternal() {
@@ -164,12 +169,26 @@ namespace webrtc
         sched_->doAsync([this](){ this->WorkInPassive(); });
 #elif SCHED_MODE == ACTIVE_MODE
         doInContext([this](){ this->InitV(); });
+#elif SCHED_MODE == HOOK_MODE
+        InitV();
 #endif
     }
 
-    void NvEncoder::InitV()
-    {
-        ctx_ = new CtxType(m_width, m_height);
+        bool NvEncoder::Keep() {
+            int64_t now = m_clock->TimeInMicroseconds();
+            if (last_ts > 0) {
+                auto diff = now - last_ts;
+                if (diff < du_) {
+                    return false;
+                }
+//                open3d::utility::LogInfo("keep for du {}ms", diff/1000);
+            }
+            last_ts = now;
+            return true;
+        }
+        void NvEncoder::InitV()
+        {
+            ctx_ = new CtxType(m_width, m_height);
         ctx_->create();
         bool result = true;
         if (m_initializationResult == CodecInitializationResult::NotInitialized)
@@ -333,12 +352,59 @@ namespace webrtc
     }
 
     void NvEncoder::doInContext(std::function<void()> &&f) {
-#if SCHED_MODE == PASSIVE_MODE
+#if SCHED_MODE == PASSIVE_MODE || SCHED_MODE == HOOK_MODE
         std::unique_lock<std::mutex> lock(mt_);
         requests_.push_back(f);
 #elif SCHED_MODE == ACTIVE_MODE
         sched_->doAsync(std::move(f));
 #endif
+    }
+#define CHECK_ERR() do { \
+    auto err = glGetError(); \
+    if (err != 0) {   \
+            std::cout << __FILE__ << ":" << __LINE__ << ": opengl error " << err << std::endl; \
+}\
+    } while(0)
+    void NvEncoder::WaitFrameDone() {
+        auto idx = waited_frame_.exchange(-1);
+        if(idx >= 0) {
+//            std::cout << "wait done " << std::this_thread::get_id() << std::endl;
+            ProcessEncodedFrame(idx, waited_ts_);
+        }
+    }
+    void NvEncoder::RecvFromFilament(void *fbo, void *pbo) {
+        if(!Keep()) {
+            return;
+        }
+//        std::cout << "recv frame" << std::this_thread::get_id() << std::endl;
+        decltype(requests_) requests;
+        {
+            std::unique_lock<std::mutex> lock(mt_);
+            requests = std::move(requests_);
+        }
+        for (auto &r: requests) {
+            r();
+        }
+        requests.clear();
+        const int curFrameNum = GetCurrentFrameCount() % bufferedFrameNum;
+        const auto tex = m_renderTextures[curFrameNum];
+        if (tex == nullptr)
+            return;
+        const GLuint dstName = reinterpret_cast<uintptr_t>(tex->GetNativeTexturePtrV());
+//        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D, dstName, 1);
+        glBindTexture(GL_TEXTURE_2D, dstName);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, (GLuint)(long)pbo);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
+                        m_width, m_height,
+                        GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+        int64_t timestamp_us = m_clock->TimeInMicroseconds();
+        auto idx = EncodeFrameEx(timestamp_us);
+        waited_frame_.store(idx);
+        waited_ts_ = timestamp_us;
+        // call in another thread
+//        sched_->doAsync([=](){ this->ProcessEncodedFrame(idx, timestamp_us);});
     }
     void NvEncoder::RecvOpen3DCPUFrame(const std::shared_ptr<open3d::core::Tensor>& frame) {
 #if SCHED_MODE == PASSIVE_MODE
@@ -351,6 +417,8 @@ namespace webrtc
                 EncodeFrame(timestamp_us);
             }
         });
+#elif SCHED_MODE == HOOK_MODE
+        assert(false);
 #endif
     }
 
@@ -469,6 +537,9 @@ namespace webrtc
             std::memcpy(&nvEncReconfigureParams.reInitEncodeParams, &nvEncInitializeParams, sizeof(nvEncInitializeParams));
             nvEncReconfigureParams.version = NV_ENC_RECONFIGURE_PARAMS_VER;
             errorCode = pNvEncodeAPI->nvEncReconfigureEncoder(pEncoderInterface, &nvEncReconfigureParams);
+            if(!(NV_RESULT(errorCode))) {
+                std::cout << "error code " << errorCode << " frame rate " << nvEncInitializeParams.frameRateNum << " bit rate " << m_targetBitrate << std::endl;
+            }
             checkf(NV_RESULT(errorCode), "Failed to reconfigure encoder setting");
         }
     }
@@ -516,25 +587,22 @@ bool NvEncoder::CopyBuffer(void* frame)
         return b;
 #endif
     }
-
-    //entry for encoding a frame
-    bool NvEncoder::EncodeFrame(int64_t timestamp_us)
+    int32 NvEncoder::EncodeFrameEx(int64_t timestamp_us)
     {
         UpdateSettings();
-        uint32 bufferIndexToWrite = frameCount % bufferedFrameNum;
+        int32 bufferIndexToWrite = frameCount % bufferedFrameNum;
         Frame& frame = bufferedFrames[bufferIndexToWrite];
 //#pragma region configure per-frame encode parameters
         NV_ENC_PIC_PARAMS picParams = {};
         picParams.version = NV_ENC_PIC_PARAMS_VER;
         picParams.pictureStruct = NV_ENC_PIC_STRUCT_FRAME;
+//        picParams.pictureStruct = NV_ENC_PIC_STRUCT_FIELD_BOTTOM_TOP;
         picParams.inputBuffer = frame.inputFrame.mappedResource;
         picParams.bufferFmt = frame.inputFrame.bufferFormat;
         picParams.inputWidth = nvEncInitializeParams.encodeWidth;
         picParams.inputHeight = nvEncInitializeParams.encodeHeight;
         picParams.outputBitstream = frame.outputFrame;
         picParams.inputTimeStamp = frameCount;
-//#pragma endregion
-//#pragma region start encoding
         if (isIdrFrame)
         {
             picParams.encodePicFlags = NV_ENC_PIC_FLAG_FORCEIDR | NV_ENC_PIC_FLAG_FORCEINTRA;
@@ -542,15 +610,21 @@ bool NvEncoder::CopyBuffer(void* frame)
         }
         errorCode = pNvEncodeAPI->nvEncEncodePicture(pEncoderInterface, &picParams);
         checkf(NV_RESULT(errorCode), "Failed to encode frame");
-//#pragma endregion
-        ProcessEncodedFrame(frame, timestamp_us);
         frameCount++;
+        return bufferIndexToWrite;
+    }
+
+    //entry for encoding a frame
+    bool NvEncoder::EncodeFrame(int64_t timestamp_us)
+    {
+        ProcessEncodedFrame(EncodeFrameEx(timestamp_us), timestamp_us);
         return true;
     }
 
     //get encoded frame
-    void NvEncoder::ProcessEncodedFrame(Frame& frame, int64_t timestamp_us)
+    void NvEncoder::ProcessEncodedFrame(int32 bufferIndexToWrite, int64_t timestamp_us)
     {
+        Frame& frame = bufferedFrames[bufferIndexToWrite];
 //#pragma region retrieve encoded frame from output buffer
         NV_ENC_LOCK_BITSTREAM lockBitStream = {};
         lockBitStream.version = NV_ENC_LOCK_BITSTREAM_VER;
@@ -605,7 +679,7 @@ bool NvEncoder::CopyBuffer(void* frame)
         registerResource.bufferFormat = m_bufferFormat;
         registerResource.bufferUsage = NV_ENC_INPUT_IMAGE;
         errorCode = pNvEncodeAPI->nvEncRegisterResource(pEncoderInterface, &registerResource);
-        checkf(NV_RESULT(errorCode), "nvEncRegisterResource error");
+        checkf(NV_RESULT(errorCode), "nvEncRegisterResource error " );
         return registerResource.registeredResource;
     }
     void NvEncoder::MapResources(InputFrame& inputFrame)
