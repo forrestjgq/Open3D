@@ -122,6 +122,7 @@ public:
     /// Sends a draw event to the window through the operating system's
     /// event queue.
     void PostRedraw();
+    void EnableRegularRedraw(int ms);
 
     void SetTopmost(bool topmost);
     void RaiseToTop() const;
@@ -185,6 +186,8 @@ public:
     /// WebRTCWindowSystem.
     std::string GetWebRTCUID() const;
 
+    using RenderCallback = void (*)(const char *action, void *user, void *arg1, void *arg2, void *arg3);
+    void SetRenderCallback(RenderCallback callback, void *user);
 protected:
     /// Returns the preferred size of the window. The window is not
     /// obligated to honor this size. If all children of the window

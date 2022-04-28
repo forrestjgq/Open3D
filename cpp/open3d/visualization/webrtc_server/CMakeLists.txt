@@ -1,4 +1,69 @@
 open3d_ispc_add_library(webrtc_server OBJECT)
+if(BUILD_CUDA_MODULE)
+
+
+    find_package(CUDA REQUIRED)
+    target_link_libraries(Open3D PRIVATE cuda)
+    add_definitions(-D_DEBUG=0)
+    add_definitions(-DUSE_NVENC -DUNITY_LINUX)
+    set(nvenc_src
+        NvEncoderImpl.cpp
+        nvenc/NvCodec/codec/NvEncoder.cpp
+        nvenc/NvCodec/codec/NvEncoderGL.cpp
+        nvenc/builtin_video_encoder_factory.cc
+        nvenc/DummyVideoEncoder.cpp
+        nvenc/DummyVideoEncoder.h
+        nvenc/internal_encoder_factory.cc
+        nvenc/pch.cpp
+        nvenc/Logger.cpp
+        nvenc/UnityVideoEncoderFactory.cpp
+        nvenc/GraphicsDevice/IGraphicsDevice.cpp
+        nvenc/GraphicsDevice/ITexture2D.cpp
+        nvenc/GraphicsDevice/OpenGL/OpenGLTexture2D.cpp
+        nvenc/GraphicsDevice/OpenGL/OpenGLTexture2D.h
+        nvenc/GraphicsDevice/OpenGL/OpenGLGraphicsDevice.cpp
+        nvenc/GraphicsDevice/Cuda/CudaContext.cpp
+        nvenc/Dynlink/CMakeLists.txt
+        nvenc/Dynlink/libcuda.so.init.c
+        nvenc/Dynlink/libcuda.so.tramp.S
+        nvenc/Dynlink/libnvcuvid.so.init.c
+        nvenc/Dynlink/libnvcuvid.so.tramp.S
+        nvenc/Dynlink/libnvidia-encode.so.init.c
+        nvenc/Dynlink/libnvidia-encode.so.tramp.S
+    )
+    set(CTX_USAGE "egl")
+    add_definitions(-DCTX_GLUT=1 -DCTX_EGL=2 -DCTX_FILAMENT=3)
+    if(${CTX_USAGE} STREQUAL "glut")
+        find_package(GLUT REQUIRED)
+        target_link_libraries(Open3D PRIVATE glut)
+        add_definitions(-DCTX_TYPE=1)
+    elseif(${CTX_USAGE} STREQUAL "egl")
+        list(APPEND nvenc_src nvenc/NvCodec/codec/PlatformEGLHeadless.cpp)
+        add_definitions(-DCTX_TYPE=2)
+    elseif(${CTX_USAGE} STREQUAL "filament")
+        list(APPEND nvenc_src nvenc/NvCodec/codec/PlatformEGLHeadless.cpp)
+        add_definitions(-DCTX_TYPE=3)
+    endif()
+
+#    set(SCHED_MODE "passive")
+#    set(SCHED_MODE "active")
+if(${CTX_USAGE} STREQUAL "filament")
+    set(SCHED_MODE "hook")
+else()
+    set(SCHED_MODE "passive")
+endif()
+    add_definitions(-DPASSIVE_MODE=1 -DACTIVE_MODE=2 -DHOOK_MODE=3)
+    if(${SCHED_MODE} STREQUAL "passive")
+        add_definitions(-DSCHED_MODE=1)
+    elseif(${SCHED_MODE} STREQUAL "active")
+        add_definitions(-DSCHED_MODE=2)
+    elseif(${SCHED_MODE} STREQUAL "hook")
+        add_definitions(-DSCHED_MODE=3)
+    endif()
+else()
+    # NVENC is not supported
+    set(nvenc_src)
+endif()
 
 target_sources(webrtc_server PRIVATE
     BitmapTrackSource.cpp
@@ -6,7 +71,9 @@ target_sources(webrtc_server PRIVATE
     ImageCapturer.cpp
     PeerConnectionManager.cpp
     WebRTCWindowSystem.cpp
+    ${nvenc_src}
 )
+
 
 target_compile_definitions(webrtc_server PRIVATE
     $<$<PLATFORM_ID:Linux,Darwin>:WEBRTC_POSIX>
@@ -21,7 +88,6 @@ open3d_show_and_abort_on_warning(webrtc_server)
 open3d_set_global_properties(webrtc_server)
 open3d_set_open3d_lib_properties(webrtc_server)
 open3d_link_3rdparty_libraries(webrtc_server)
-
 
 if (NOT GUI_RESOURCE_DIR)
     message(FATAL_ERROR "GUI_RESOURCE_DIR is not defined.")

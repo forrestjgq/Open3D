@@ -25,9 +25,13 @@ elseif (WIN32)
 else()  # Linux
     if(GLIBCXX_USE_CXX11_ABI)
         set(WEBRTC_URL
-            https://github.com/isl-org/open3d_downloads/releases/download/webrtc-v3/webrtc_${WEBRTC_VER}_cxx-abi-1.tar.gz
-        )
-        set(WEBRTC_SHA256 0d98ddbc4164b9e7bfc50b7d4eaa912a753dabde0847d85a64f93a062ae4c335)
+                http://192.168.2.114:8011/webrtc/webrtc_60e6748_cxx-abi-1.tar.gz
+                )
+#        set(WEBRTC_URL
+#            https://github.com/isl-org/open3d_downloads/releases/download/webrtc-v34/webrtc_${WEBRTC_VER}_cxx-abi-1.tar.gz
+#        )
+        set(WEBRTC_SHA256 fe3e0fe05727036f8a34ba69777f9522a1fa9f1081b365768e7c13fa19e4c0e6)
+        #set(WEBRTC_SHA256 3cedd2a414739cac95ac4ff0c0c4c59f0201ef58133a7cdaede5dab5b226f92b)
     else()
         set(WEBRTC_URL
             https://github.com/isl-org/open3d_downloads/releases/download/webrtc-v3/webrtc_${WEBRTC_VER}_cxx-abi-0.tar.gz

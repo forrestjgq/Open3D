@@ -423,6 +423,7 @@ public:
     void SetAllowedPeerid(const std::string &peerid) {
         allowed_peerid_ = peerid;
     }
+    void Initialize();
     bool InitializePeerConnection();
     const std::map<std::string, HttpServerRequestHandler::HttpFunction>
     GetHttpApi();
@@ -473,6 +474,7 @@ protected:
             const std::string& peerid);
 
 protected:
+    bool inited_ = false;
     std::unique_ptr<webrtc::TaskQueueFactory> task_queue_factory_;
     rtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface>
             peer_connection_factory_;

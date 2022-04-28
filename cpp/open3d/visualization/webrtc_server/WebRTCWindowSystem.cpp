@@ -133,6 +133,7 @@ struct WebRTCWindowSystem::Impl {
 
     std::thread webrtc_thread_;
     bool sever_started_ = false;
+    bool pcm_created_ = false;
 
     std::unordered_map<std::string, std::function<std::string(std::string)>>
             data_channel_message_callbacks_;
@@ -157,6 +158,9 @@ WebRTCWindowSystem::WebRTCWindowSystem()
               BitmapWindowSystem::Rendering::HEADLESS
 #else
               BitmapWindowSystem::Rendering::NORMAL
+#endif
+#if CTX_TYPE == CTX_FILAMENT
+              ,true
 #endif
               ),
       impl_(new WebRTCWindowSystem::Impl()) {
@@ -276,6 +280,9 @@ WebRTCWindowSystem::OSWindow WebRTCWindowSystem::CreateOSWindow(
     StartWebRTCServer();
     WebRTCWindowSystem::OSWindow os_window = BitmapWindowSystem::CreateOSWindow(
             o3d_window, width, height, title, flags);
+#if ACTIVE_MODE == SCHED_MODE || SCHED_MODE == HOOK_MODE
+    SetRegularRedraw(os_window, 200);  // force redraw regularly
+#endif
     std::string window_uid = impl_->GenerateUID();
     impl_->os_window_to_uid_.insert({os_window, window_uid});
     utility::LogInfo("Window {} created.", window_uid);
@@ -354,6 +361,8 @@ void WebRTCWindowSystem::StartWebRTCServer() {
             impl_->peer_connection_manager_ =
                     std::make_unique<PeerConnectionManager>(
                             ice_servers, config["urls"], ".*", "");
+            impl_->peer_connection_manager_->Initialize();
+            impl_->pcm_created_ = true;
             impl_->peer_connection_manager_->SetAllowedPeerid(impl_->default_peerid_);
             if (!impl_->peer_connection_manager_->InitializePeerConnection()) {
                 utility::LogError("InitializePeerConnection() failed.");
@@ -516,7 +525,9 @@ void WebRTCWindowSystem::RegisterDataChannelMessageCallback(
 
 void WebRTCWindowSystem::OnFrame(const std::string &window_uid,
                                  const std::shared_ptr<core::Tensor> &im) {
-    impl_->peer_connection_manager_->OnFrame(window_uid, im);
+    if (impl_->pcm_created_) {
+        impl_->peer_connection_manager_->OnFrame(window_uid, im);
+    }
 }
 
 void WebRTCWindowSystem::SendMessage(const std::string &peerid, const std::string &msg) {
@@ -536,14 +547,14 @@ void WebRTCWindowSystem::SendInitFrames(const std::string &window_uid) {
     static const int s_sleep_between_frames_ms = 100;
     const auto os_window = GetOSWindowByUID(window_uid);
     if (!os_window) return;
-    PostCallableEvent([this]() { ForceRender(true); });
+//    PostCallableEvent([this]() { ForceRender(true); });
     for (int i = 0; os_window != nullptr && i < s_max_initial_frames; ++i) {
         PostRedrawEvent(os_window);
         std::this_thread::sleep_for(
                 std::chrono::milliseconds(s_sleep_between_frames_ms));
         utility::LogDebug("Sent init frames #{} to {}.", i, window_uid);
     }
-    PostCallableEvent([this]() { ForceRender(false); });
+//    PostCallableEvent([this]() { ForceRender(false); });
 }
 
 std::string WebRTCWindowSystem::CallHttpAPI(const std::string &entry_point,

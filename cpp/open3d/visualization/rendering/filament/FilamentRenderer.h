@@ -54,6 +54,7 @@ class FilamentView;
 
 class FilamentRenderer : public Renderer {
 public:
+    using SchedCallback = void (*)(const char *action, void *user, void *arg1, void *arg2, void *arg3);
     FilamentRenderer(filament::Engine& engine,
                      void* native_drawable,
                      FilamentResourceManager& resource_mgr);
@@ -78,6 +79,10 @@ public:
                            int height,
                            std::function<void(std::shared_ptr<core::Tensor>)>
                                    callback) override;
+    void RequestReadRGBAPixels(int width,
+                           int height,
+                           std::function<void(std::shared_ptr<core::Tensor>)>
+                           callback);
     void EndFrame() override;
 
     void SetOnAfterDraw(std::function<void()> callback) override;
@@ -119,6 +124,8 @@ public:
     FilamentScene* GetGuiScene() const { return gui_scene_.get(); }
 
     filament::Renderer* GetNative() { return renderer_; }
+    void SetFilamentCallback(SchedCallback callback, void *user);
+    void OnFilamentCallback(void *user);
 
 private:
     friend class FilamentRenderToBuffer;
@@ -141,6 +148,8 @@ private:
     bool frame_started_ = false;
     std::function<void()> on_after_draw_;
     bool needs_wait_after_draw_ = false;
+    SchedCallback filament_callback_ = nullptr;
+    void* filament_ud = nullptr;
 };
 
 }  // namespace rendering

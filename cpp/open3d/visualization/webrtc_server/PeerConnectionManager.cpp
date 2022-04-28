@@ -53,6 +53,13 @@
 #include "open3d/visualization/webrtc_server/ImageCapturer.h"
 #include "open3d/visualization/webrtc_server/VideoFilter.h"
 #include "open3d/visualization/webrtc_server/VideoScaler.h"
+#ifdef USE_NVENC
+#include "open3d/visualization/webrtc_server/nvenc/pch.h"
+#include "open3d/visualization/webrtc_server/nvenc/DummyVideoEncoder.h"
+#include "open3d/visualization/webrtc_server/nvenc/UnityVideoEncoderFactory.h"
+#include "open3d/visualization/webrtc_server/NvEncodeImpl.h"
+#endif
+
 
 namespace open3d {
 namespace visualization {
@@ -72,7 +79,11 @@ struct IceServer {
     std::string user;
     std::string pass;
 };
-
+#ifdef USE_NVENC
+unity::webrtc::IVideoEncoderObserver *GetEncoderObserver() {
+    return NvEncoderImpl::GetInstance();
+}
+#endif
 static IceServer GetIceServerFromUrl(const std::string &url) {
     IceServer srv;
     srv.url = url;
@@ -131,8 +142,13 @@ CreatePeerConnectionFactoryDependencies() {
     media_dependencies.audio_processing =
             webrtc::AudioProcessingBuilder().Create();
 
+#ifdef USE_NVENC
+    media_dependencies.video_encoder_factory =
+            std::make_unique<unity::webrtc::UnityVideoEncoderFactory>(GetEncoderObserver());
+#else
     media_dependencies.video_encoder_factory =
             webrtc::CreateBuiltinVideoEncoderFactory();
+#endif
     media_dependencies.video_decoder_factory =
             webrtc::CreateBuiltinVideoDecoderFactory();
 
@@ -147,10 +163,7 @@ PeerConnectionManager::PeerConnectionManager(
         const Json::Value &config,
         const std::string &publish_filter,
         const std::string &webrtc_udp_port_range)
-    : task_queue_factory_(webrtc::CreateDefaultTaskQueueFactory()),
-      peer_connection_factory_(webrtc::CreateModularPeerConnectionFactory(
-              CreatePeerConnectionFactoryDependencies())),
-      ice_server_list_(ice_server_list),
+    : ice_server_list_(ice_server_list),
       config_(config),
       publish_filter_(publish_filter) {
     // Set the webrtc port range.
@@ -573,6 +586,12 @@ const Json::Value PeerConnectionManager::GetIceCandidateList(
     return value;
 }
 
+void PeerConnectionManager::Initialize() {
+    task_queue_factory_ = webrtc::CreateDefaultTaskQueueFactory();
+    peer_connection_factory_ = webrtc::CreateModularPeerConnectionFactory(
+            CreatePeerConnectionFactoryDependencies());
+    inited_ = true;
+}
 // Check if factory is initialized.
 bool PeerConnectionManager::InitializePeerConnection() {
     return (peer_connection_factory_.get() != nullptr);
@@ -792,6 +811,9 @@ void PeerConnectionManager::CloseWindowConnections(
 
 void PeerConnectionManager::OnFrame(const std::string &window_uid,
                                     const std::shared_ptr<core::Tensor> &im) {
+    if(!inited_) {
+        return;
+    }
     // Get the WebRTC stream that corresponds to the window_uid.
     // video_track_source is nullptr if the server is running but no client is
     // connected.

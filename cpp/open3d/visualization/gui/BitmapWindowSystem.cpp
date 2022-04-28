@@ -165,13 +165,17 @@ static int duration(const std::chrono::high_resolution_clock::time_point &e,
 struct BitmapWindowSystem::Impl {
     BitmapWindowSystem::OnDrawCallback on_draw_;
     BitmapEventQueue event_queue_;
+    bool fake_read_ = false;  // fake reading pixels
+    int max_fps_ = 0;
     int max_redraw_du_ = 0;
     int force_draw_requested_ = 0;
     std::chrono::high_resolution_clock::time_point last_draw_ = now();
 };
 
-BitmapWindowSystem::BitmapWindowSystem(Rendering mode /*= Rendering::NORMAL*/)
+BitmapWindowSystem::BitmapWindowSystem(Rendering mode /*= Rendering::NORMAL*/,
+                                       bool fake_read /*= false*/)
     : impl_(new BitmapWindowSystem::Impl()) {
+    impl_->fake_read_ = fake_read;
     if (mode == Rendering::HEADLESS) {
 #if !defined(__APPLE__) && !defined(_WIN32) && !defined(_WIN64)
         rendering::EngineInstance::EnableHeadless();
@@ -246,6 +250,10 @@ void BitmapWindowSystem::PostCallableEvent(std::function<void()> todo) {
     impl_->event_queue_.push(std::make_shared<BitmapCallableEvent>(todo));
 }
 
+void BitmapWindowSystem::SetRegularRedraw(OSWindow w, int ms) {
+    auto hw = (BitmapWindow *)w;
+    hw->o3d_window->EnableRegularRedraw(ms);
+}
 void BitmapWindowSystem::PostRedrawEvent(OSWindow w) {
     auto hw = (BitmapWindow *)w;
     impl_->event_queue_.push(std::make_shared<BitmapDrawEvent>(hw));
@@ -312,6 +320,10 @@ float BitmapWindowSystem::GetUIScaleFactor(OSWindow w) const { return 1.0f; }
 
 void BitmapWindowSystem::SetWindowTitle(OSWindow w, const char *title) {}
 
+Window *BitmapWindowSystem::GetO3DWindow(OSWindow w) {
+    return ((BitmapWindow *)w)->o3d_window;
+}
+
 Point BitmapWindowSystem::GetMousePosInWindow(OSWindow w) const {
     return ((BitmapWindow *)w)->mouse_pos;
 }
@@ -345,14 +357,18 @@ rendering::FilamentRenderer *BitmapWindowSystem::CreateRenderer(OSWindow w) {
         }
 
         auto size = this->GetWindowSizePixels(w);
-        Window *window = ((BitmapWindow *)w)->o3d_window;
+        if(impl_->fake_read_) {
+            renderer->RequestReadPixels(size.width, size.height, nullptr);
+        } else {
+            Window *window = ((BitmapWindow *)w)->o3d_window;
 
-        auto on_pixels = [this, window](std::shared_ptr<core::Tensor> image) {
-            if (this->impl_->on_draw_) {
-                this->impl_->on_draw_(window, image);
-            }
-        };
-        renderer->RequestReadPixels(size.width, size.height, on_pixels);
+            auto on_pixels = [this, window](std::shared_ptr<core::Tensor> image) {
+                if (this->impl_->on_draw_) {
+                    this->impl_->on_draw_(window, image);
+                }
+            };
+            renderer->RequestReadPixels(size.width, size.height, on_pixels);
+        }
     };
     renderer->SetOnAfterDraw(on_after_draw);
     return renderer;
@@ -364,7 +380,11 @@ void BitmapWindowSystem::ResizeRenderer(OSWindow w,
     renderer->UpdateBitmapSwapChain(size.width, size.height);
 }
 
+int BitmapWindowSystem::GetMaxRenderFPS() {
+    return impl_->max_fps_;
+}
 void BitmapWindowSystem::SetMaxRenderFPS(int fps) {
+    impl_->max_fps_ = fps;
     if (fps <= 0) {
         utility::LogInfo("disable webrtc render fps limitation");
         impl_->max_redraw_du_ = 0;

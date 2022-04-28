@@ -51,7 +51,7 @@ public:
         HEADLESS  // uses EGL, does not require the OS to have a window system.
                   // (Linux only)
     };
-    BitmapWindowSystem(Rendering mode = Rendering::NORMAL);
+    BitmapWindowSystem(Rendering mode = Rendering::NORMAL, bool fake_read=false);
     ~BitmapWindowSystem();
 
     void Initialize() override;
@@ -77,6 +77,7 @@ public:
     void PostMouseEvent(OSWindow w, const MouseEvent& e);
     void PostKeyEvent(OSWindow w, const KeyEvent& e);
     void PostTextInputEvent(OSWindow w, const TextInputEvent& e);
+    void SetRegularRedraw(OSWindow w, int ms);
 
     bool GetWindowIsVisible(OSWindow w) const override;
     void ShowWindow(OSWindow w, bool show) override;
@@ -113,7 +114,9 @@ public:
     MenuBase* CreateOSMenu() override;
 
     void SetMaxRenderFPS(int fps);
+    int GetMaxRenderFPS();
     void ForceRender(bool render);
+    Window *GetO3DWindow(OSWindow w);
 
 private:
     struct Impl;

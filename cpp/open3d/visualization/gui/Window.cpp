@@ -223,6 +223,7 @@ struct Window::Impl {
     // The only source of ground truth is button events, so the rest of
     // the time we monitor key up/down events.
     int mouse_mods_ = 0;  // ORed KeyModifiers
+    int regular_redraw_ms_ = 0;
     double last_render_time_ = 0.0;
     double last_button_down_time_ = 0.0;  // we have to compute double-click
     MouseButton last_button_down_ = MouseButton::NONE;
@@ -448,6 +449,9 @@ std::string Window::GetWebRTCUID() const {
 #endif
 }
 
+void Window::SetRenderCallback(RenderCallback callback, void *user) {
+    impl_->renderer_->SetFilamentCallback(callback, user);
+}
 const std::vector<std::shared_ptr<Widget>>& Window::GetChildren() const {
     return impl_->children_;
 }
@@ -602,6 +606,9 @@ void Window::PostRedraw() {
     }
 }
 
+void Window::EnableRegularRedraw(int ms) {
+    impl_->regular_redraw_ms_ = ms;
+}
 void Window::RaiseToTop() const {
     Application::GetInstance().GetWindowSystem().RaiseWindowToTop(
             impl_->window_);
@@ -1236,6 +1243,15 @@ void Window::OnTextInput(const TextInputEvent& e) {
 void Window::OnTickEvent(const TickEvent& e) {
     auto old_context = MakeDrawContextCurrent();
     bool redraw = false;
+
+    if (impl_->regular_redraw_ms_ > 0) {
+        double now = Application::GetInstance().Now();
+        double dt_sec = now - impl_->last_render_time_;
+        long dt_ms = long(dt_sec * 1000);
+        if (dt_ms > impl_->regular_redraw_ms_) {
+            redraw = true;
+        }
+    }
 
     if (impl_->on_tick_event_) {
         redraw = impl_->on_tick_event_();

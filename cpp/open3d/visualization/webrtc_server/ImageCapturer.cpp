@@ -33,19 +33,56 @@
 #include <media/base/video_common.h>
 
 #include <memory>
+#include "open3d/visualization/webrtc_server/WebRTCWindowSystem.h"
 
 #include "open3d/core/Tensor.h"
 #include "open3d/utility/Logging.h"
-
+#ifdef USE_NVENC
+#include "open3d/visualization/webrtc_server/nvenc/pch.h"
+#include "open3d/visualization/webrtc_server/nvenc/DummyVideoEncoder.h"
+#include "open3d/visualization/webrtc_server/NvEncodeImpl.h"
+#include "open3d/visualization/webrtc_server/nvenc/NvCodec/codec/NvEncoder.h"
+#endif
 namespace open3d {
 namespace visualization {
 namespace webrtc_server {
 
-ImageCapturer::ImageCapturer(const std::string& url_,
+ImageCapturer::ImageCapturer(const std::string& url,
                              const std::map<std::string, std::string>& opts)
-    : ImageCapturer(opts) {}
+    :  width_(0), height_(0), url_(url) {
+    if (opts.find("width") != opts.end()) {
+        width_ = std::stoi(opts.at("width"));
+    }
+    if (opts.find("height") != opts.end()) {
+        height_ = std::stoi(opts.at("height"));
+    }
 
-ImageCapturer::~ImageCapturer() {}
+    if (url_.empty()) {
+        return;
+    }
+    auto w = WebRTCWindowSystem::GetInstance()->GetOSWindowByUID(url_);
+    if(w == nullptr) {
+        return;
+    }
+    auto sz = WebRTCWindowSystem::GetInstance()->GetWindowSize(w);
+    if(sz.width == 0 || sz.height == 0) {
+        return;
+    }
+    auto o3d = WebRTCWindowSystem::GetInstance()->GetO3DWindow(w);
+    NvEncoderImpl::GetInstance()->AddEncoder(sz.width, sz.height, o3d, [this](auto encoder){
+        encoder->CaptureFrame.connect(this, &ImageCapturer::DelegateFrame);
+        impl_id_.store(encoder->Id());
+    });
+}
+
+    ImageCapturer::~ImageCapturer() {
+#ifdef USE_NVENC
+        if (impl_id_.load() > 0) {
+        NvEncoderImpl::GetInstance()->RemoveEncoder(impl_id_.load());
+        impl_id_ = 0;
+    }
+#endif
+}
 
 ImageCapturer* ImageCapturer::Create(
         const std::string& url,
@@ -54,16 +91,26 @@ ImageCapturer* ImageCapturer::Create(
     return image_capturer.release();
 }
 
-ImageCapturer::ImageCapturer(const std::map<std::string, std::string>& opts)
-    : width_(0), height_(0) {
-    if (opts.find("width") != opts.end()) {
-        width_ = std::stoi(opts.at("width"));
-    }
-    if (opts.find("height") != opts.end()) {
-        height_ = std::stoi(opts.at("height"));
+#ifdef USE_NVENC
+void ImageCapturer::OnCaptureResult(
+        const std::shared_ptr<core::Tensor>& frame) {
+//    static long cnt = 0;
+//    std::cout << "encode frame " << cnt++ << std::endl;
+    auto impl = NvEncoderImpl::GetInstance();
+    if (impl_id_.load() > 0) {
+        impl->EncodeFrame(impl_id_, frame);
+    } else {
+#if CTX_TYPE == CTX_FILAMENT
+        auto w = WebRTCWindowSystem::GetInstance()->GetOSWindowByUID(url_);
+        WebRTCWindowSystem::GetInstance()->PostRedrawEvent(w);
+#endif
     }
 }
+void ImageCapturer::DelegateFrame(const webrtc::VideoFrame &frame) {
+    broadcaster_.OnFrame(frame);
+}
 
+#else
 void ImageCapturer::OnCaptureResult(
         const std::shared_ptr<core::Tensor>& frame) {
     int height = (int)frame->GetShape(0);
@@ -111,6 +158,7 @@ void ImageCapturer::OnCaptureResult(
                           conversion_result);
     }
 }
+#endif
 
 // Overide rtc::VideoSourceInterface<webrtc::VideoFrame>.
 void ImageCapturer::AddOrUpdateSink(
