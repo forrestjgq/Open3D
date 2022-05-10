@@ -209,6 +209,7 @@ namespace webrtc
         openEncodeSessionExParams.apiVersion = NVENCAPI_VERSION;
 
         errorCode = pNvEncodeAPI->nvEncOpenEncodeSessionEx(&openEncodeSessionExParams, &pEncoderInterface);
+        open3d::utility::LogInfo("open encoder error {}", errorCode);
         checkf(NV_RESULT(errorCode), "Unable to open NvEnc encode session");
 //#pragma endregion
 //#pragma region set initialization parameters

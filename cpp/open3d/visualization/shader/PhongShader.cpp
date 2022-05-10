@@ -346,8 +346,10 @@ bool PhongShaderForTriangleMesh::PrepareBinding(
                 case RenderOption::MeshColorOption::Color:
                     if (mesh.HasVertexColors()) {
                         color = mesh.vertex_colors_[vi];
-                        break;
+                    } else {
+                        color = option.default_mesh_color_;
                     }
+                    break;
                     // fallthrough
                 case RenderOption::MeshColorOption::Default:
                 default:
