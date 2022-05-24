@@ -56,7 +56,7 @@ ImageCapturer::ImageCapturer(const std::string& url,
     if (opts.find("height") != opts.end()) {
         height_ = std::stoi(opts.at("height"));
     }
-
+#ifdef USE_NVENC
     if (url_.empty()) {
         return;
     }
@@ -73,6 +73,7 @@ ImageCapturer::ImageCapturer(const std::string& url,
         encoder->CaptureFrame.connect(this, &ImageCapturer::DelegateFrame);
         impl_id_.store(encoder->Id());
     });
+#endif
 }
 
     ImageCapturer::~ImageCapturer() {

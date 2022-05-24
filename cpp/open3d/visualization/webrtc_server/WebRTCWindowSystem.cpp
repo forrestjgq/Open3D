@@ -159,7 +159,7 @@ WebRTCWindowSystem::WebRTCWindowSystem()
 #else
               BitmapWindowSystem::Rendering::NORMAL
 #endif
-#if CTX_TYPE == CTX_FILAMENT
+#if defined(CTX_TYPE) && CTX_TYPE == CTX_FILAMENT
               ,true
 #endif
               ),
