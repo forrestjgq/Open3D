@@ -182,28 +182,28 @@ PeerConnectionManager::PeerConnectionManager(
         return this->GetIceServers();
     };
 
-    func_["/api/login"] = [this](const struct mg_request_info *req_info,
+    func_["/api/login"] = [](const struct mg_request_info *req_info,
                                 const Json::Value &in) -> Json::Value {
       utility::LogInfo("[Called HTTP API] /api/login");
       auto msg = utility::JsonToString(in);
       auto rsp = WebRTCWindowSystem::GetInstance()->OnHttpMessage("/api/login", msg);
       return utility::StringToJson(rsp);
     };
-    func_["/api/logout"] = [this](const struct mg_request_info *req_info,
+    func_["/api/logout"] = [](const struct mg_request_info *req_info,
                                  const Json::Value &in) -> Json::Value {
       utility::LogInfo("[Called HTTP API] /api/logout");
       auto msg = utility::JsonToString(in);
       auto rsp = WebRTCWindowSystem::GetInstance()->OnHttpMessage("/api/logout", msg);
       return utility::StringToJson(rsp);
     };
-    func_["/api/open"] = [this](const struct mg_request_info *req_info,
+    func_["/api/open"] = [](const struct mg_request_info *req_info,
                                 const Json::Value &in) -> Json::Value {
       utility::LogInfo("[Called HTTP API] /api/open");
       auto msg = utility::JsonToString(in);
       auto rsp = WebRTCWindowSystem::GetInstance()->OnHttpMessage("/api/open", msg);
       return utility::StringToJson(rsp);
     };
-    func_["/api/close"] = [this](const struct mg_request_info *req_info,
+    func_["/api/close"] = [](const struct mg_request_info *req_info,
                                 const Json::Value &in) -> Json::Value {
       utility::LogInfo("[Called HTTP API] /api/close");
       auto msg = utility::JsonToString(in);

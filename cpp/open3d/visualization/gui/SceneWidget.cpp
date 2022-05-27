@@ -913,7 +913,9 @@ public:
 private:
     bool sun_interactor_enabled_ = true;
     bool space_mouse_to_editor_ = true;
+#ifdef USE_SPNAV
     bool space_mouse_sensitive_ = true;
+#endif
 
     std::unique_ptr<RotateCameraInteractor> rotate_;
     std::unique_ptr<EditModelInteractor> editor_;
